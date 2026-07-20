@@ -1,0 +1,64 @@
+#include<stdio.h>
+#include <string.h>
+
+#define MAX 500
+
+char FLAG = 'F';
+char ESCAPE = 'E';
+
+void printBytes(char msg[], char arr[], int n)
+{
+   int i;
+   printf("%s\n", msg);
+   for(i = 0; i < n; i++)
+   {
+      printf("'%c' (%d)  ", arr[i], arr[i]);
+   }
+   printf("\n\n");
+}
+
+int main()
+{
+   char str[MAX];
+   char stuffed[MAX * 2];
+   char destuffed[MAX];
+
+   int i, len;
+   int j = 0;
+   int k = 0;
+
+   printf("Enter the input string: ");
+   scanf(" %[^\n]", str);
+   len = strlen(str);
+
+   printBytes("Original bytes (Input string converted to ASCII):", str, len);
+
+   stuffed[j++] = FLAG;
+   for(i = 0; i < len; i++)
+   {
+      if(str[i] == FLAG || str[i] == ESCAPE)
+      {
+         stuffed[j++] = ESCAPE;
+      }
+      stuffed[j++] = str[i];
+   }
+   stuffed[j++] = FLAG;
+
+   printBytes("Stuffed Frame (Sent over network):", stuffed, j);
+
+   for(i = 1; i < j - 1; i++)
+   {
+      if(stuffed[i] == ESCAPE)
+      {
+         i++;
+      }
+      destuffed[k++] = stuffed[i];
+   }
+
+   printBytes("Destuffed Bytes (Received Data):", destuffed, k);
+
+   destuffed[k] = '\0';
+   printf("Recovered String: %s\n", destuffed);
+
+   return 0;
+}
