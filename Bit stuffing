@@ -1,0 +1,98 @@
+#include <stdio.h>
+#include <string.h>
+
+#define MAX_BITS 1000
+
+void displayBits(int arr[], int n)
+{
+   int i;
+   for(i = 0; i < n; i++)
+   {
+      printf("%d", arr[i]);
+      if((i + 1) % 8 == 0 && i < n - 1)
+         printf(" ");
+   }
+   printf("\n");
+}
+
+int main()
+{
+   char str[100];
+   int data[MAX_BITS];
+   int stuffed[MAX_BITS];
+   int destuffed[MAX_BITS];
+
+   int n = 0;
+   int i, j, k, ones, b;
+
+   printf("Enter the input string: ");
+   scanf(" %[^\n]", str);
+
+   int len = strlen(str);
+
+   for(i = 0; i < len; i++)
+   {
+      int ascii = (int)str[i];
+      for(b = 7; b >= 0; b--)
+      {
+         data[n++] = (ascii >> b) & 1;
+      }
+   }
+
+   printf("\nOriginal Data (Binary): ");
+   displayBits(data, n);
+
+   ones = 0;
+   j = 0;
+   for(i = 0; i < n; i++)
+   {
+      stuffed[j++] = data[i];
+      if(data[i] == 1)
+         ones++;
+      else
+         ones = 0;
+
+      if(ones == 5)
+      {
+         stuffed[j++] = 0;
+         ones = 0;
+      }
+   }
+
+   printf("Stuffed Data:           ");
+   displayBits(stuffed, j);
+
+   ones = 0;
+   k = 0;
+   for(i = 0; i < j; i++)
+   {
+      destuffed[k++] = stuffed[i];
+      if(stuffed[i] == 1)
+         ones++;
+      else
+         ones = 0;
+
+      if(ones == 5)
+      {
+         i++;
+         ones = 0;
+      }
+   }
+
+   printf("Destuffed Data:         ");
+   displayBits(destuffed, k);
+
+   printf("Recovered String:       ");
+   for(i = 0; i < k; i += 8)
+   {
+      char ch = 0;
+      for(b = 0; b < 8; b++)
+      {
+         ch = (ch << 1) | destuffed[i + b];
+      }
+      printf("%c", ch);
+   }
+   printf("\n");
+
+   return 0;
+}
