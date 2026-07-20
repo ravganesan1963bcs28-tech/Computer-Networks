@@ -1,0 +1,41 @@
+#include <stdlib.h>
+int compareInts(const void* a, const void* b) {
+    int va = *(const int*)a;
+    int vb = *(const int*)b;
+    return (va > vb) - (va < vb);
+}
+
+int findMaximumXOR(int* nums, int numsSize) {
+    if (numsSize < 2) return 0;
+
+    int maxXOR = 0;
+    int mask = 0;
+    int* prefixes = (int*)malloc(numsSize * sizeof(int));
+    for (int i = 30; i >= 0; i--) {
+        mask |= (1 << i);
+        for (int j = 0; j < numsSize; j++) {
+            prefixes[j] = nums[j] & mask;
+        }
+        qsort(prefixes, numsSize, sizeof(int), compareInts);
+        int greedyCandidate = maxXOR | (1 << i);
+        int left = 0;
+        int right = numsSize - 1;
+        while (left <= right) {
+            int currentXOR = prefixes[left] ^ prefixes[right];
+
+            if (currentXOR == greedyCandidate) {
+                maxXOR = greedyCandidate; 
+                break;
+            }
+            
+            if (prefixes[left] < (prefixes[right] ^ greedyCandidate)) {
+                left++;
+            } else {
+                right--;
+            }
+        }
+    }
+
+    free(prefixes);
+    return maxXOR;
+}
