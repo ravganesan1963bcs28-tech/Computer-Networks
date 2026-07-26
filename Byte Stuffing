@@ -1,64 +1,259 @@
-#include<stdio.h>
+#include <stdio.h>
 #include <string.h>
 
-#define MAX 500
+#define MAX 100
 
-char FLAG = 'F';
-char ESCAPE = 'E';
+int dataBytes[MAX];
+int dataBits[MAX * 8];
+int stuffedBytes[MAX * 2];
+int framedBytes[MAX * 2];
+int destuffedBytes[MAX];
+int flagByte, escByte;
 
-void printBytes(char msg[], char arr[], int n)
-{
-   int i;
-   printf("%s\n", msg);
-   for(i = 0; i < n; i++)
-   {
-      printf("'%c' (%d)  ", arr[i], arr[i]);
+int bitsToByte(int bits[]) {
+   int val = 0;
+   for (int i = 0; i < 8; i++) {
+      val = val * 2 + bits[i];
    }
-   printf("\n\n");
+   return val;
 }
 
-int main()
-{
-   char str[MAX];
-   char stuffed[MAX * 2];
-   char destuffed[MAX];
-
-   int i, len;
-   int j = 0;
-   int k = 0;
-
-   printf("Enter the input string: ");
-   scanf(" %[^\n]", str);
-   len = strlen(str);
-
-   printBytes("Original bytes (Input string converted to ASCII):", str, len);
-
-   stuffed[j++] = FLAG;
-   for(i = 0; i < len; i++)
-   {
-      if(str[i] == FLAG || str[i] == ESCAPE)
-      {
-         stuffed[j++] = ESCAPE;
-      }
-      stuffed[j++] = str[i];
+void printByteBinary(int Byte) {
+   for (int i = 7; i >= 0; i--) {
+      printf("%d", (Byte >> i) & 1);
    }
-   stuffed[j++] = FLAG;
+}
 
-   printBytes("Stuffed Frame (Sent over network):", stuffed, j);
-
-   for(i = 1; i < j - 1; i++)
-   {
-      if(stuffed[i] == ESCAPE)
-      {
-         i++;
-      }
-      destuffed[k++] = stuffed[i];
+void printByteAsBinary(const char * label, int ass[], int n) {
+   printf("%s: ", label);
+   for (int i = 0; i < n; i++) {
+      printByteBinary(ass[i]);
+      printf(" ");
    }
+   printf("\n");
+}
 
-   printBytes("Destuffed Bytes (Received Data):", destuffed, k);
+int main() {
+   int fbits[8], ebits[8];
+   char message[MAX];
+   int choice;
 
-   destuffed[k] = '\0';
-   printf("Recovered String: %s\n", destuffed);
+   printf("Enter 8-bit FLAG pattern: ");
+   for (int i = 0; i < 8; i++) {
+      scanf("%d", &fbits[i]);
+   }
+   flagByte = bitsToByte(fbits);
 
+   printf("Enter 8-bit ESC pattern: ");
+   for (int i = 0; i < 8; i++) {
+      scanf("%d", &ebits[i]);
+   }
+   escByte = bitsToByte(ebits);
+   getchar(); // Consume trailing newline
+
+   while (1) {
+      printf("\n=== CONTROL MENU ===\n");
+      printf("1. Standard String Transmission\n");
+      printf("2. Manual Byte Stream (Framing Error Test)\n");
+      printf("3. Exit System\n");
+      printf("Select option: ");
+
+      if (scanf("%d", &choice) != 1) {
+         printf("Error: Invalid numeric input. Exiting.\n");
+         break;
+      }
+      getchar(); // Clear raw newline
+
+      if (choice == 3) {
+         printf("\nShutting down system. Goodbye.\n");
+         break;
+      }
+
+      switch (choice) {
+         case 1: {
+            printf("\n--- MODE 1: Standard String Transmission ---\n");
+            printf("Enter text message: ");
+            fgets(message, sizeof(message), stdin);
+            message[strcspn(message, "\n")] = '\0';
+
+            int numBytes = strlen(message);
+            int bitIdx = 0;
+
+            // Convert characters to bits
+            for (int i = 0; i < numBytes; i++) {
+               int asciiVal = (int)message[i];
+               for (int b = 7; b >= 0; b--) {
+                  dataBits[bitIdx++] = (asciiVal >> b) & 1;
+               }
+            }
+
+            // Internal conversion back to dataBytes
+            for (int i = 0; i < numBytes; i++) {
+               int tmp[8];
+               for (int b = 0; b < 8; b++) {
+                  tmp[b] = dataBits[i * 8 + b];
+               }
+               dataBytes[i] = bitsToByte(tmp);
+            }
+
+            printf("\nSystem Configuration:\n");
+            printf("  FLAG -> "); printByteBinary(flagByte); printf("\n");
+            printf("  ESC  -> "); printByteBinary(escByte);  printf("\n\n");
+
+            printByteAsBinary(" Raw Payload", dataBytes, numBytes);
+
+            // Stuffing Process
+            int j = 0;
+            for (int i = 0; i < numBytes; i++) {
+               if (dataBytes[i] == flagByte || dataBytes[i] == escByte) {
+                  stuffedBytes[j++] = escByte;
+                  stuffedBytes[j++] = dataBytes[i];
+               } else {
+                  stuffedBytes[j++] = dataBytes[i];
+               }
+            }
+            int stuffedLen = j;
+            printByteAsBinary("Stuffed Data", stuffedBytes, stuffedLen);
+
+            // Framing Process
+            int k = 0;
+            framedBytes[k++] = flagByte;
+            for (int i = 0; i < stuffedLen; i++) {
+               framedBytes[k++] = stuffedBytes[i];
+            }
+            framedBytes[k++] = flagByte;
+            int framedLen = k;
+
+            printByteAsBinary("Framed Frame", framedBytes, framedLen);
+
+            // Destuffing Process
+            int m = 0, error = 0;
+            if (framedBytes[0] != flagByte || framedBytes[framedLen - 1] != flagByte) {
+               printf("\n[REJECTED] Error: Frame lacks start/end boundary flags.\n");
+               break;
+            }
+
+            for (int i = 1; i < framedLen - 1; i++) {
+               if (framedBytes[i] == escByte) {
+                  if (i + 1 >= framedLen - 1) {
+                     printf("\n[REJECTED] Protocol Error: Dangling ESC byte detected at terminal index.\n");
+                     error = 1;
+                     break;
+                  }
+                  i++;
+                  destuffedBytes[m++] = framedBytes[i];
+               } else if (framedBytes[i] == flagByte) {
+                  printf("\n[REJECTED] Protocol Error: Unescaped raw FLAG detected in data zone.\n");
+                  error = 1;
+                  break;
+               } else {
+                  destuffedBytes[m++] = framedBytes[i];
+               }
+            }
+
+            if (!error) {
+               printByteAsBinary("Destuffed   ", destuffedBytes, m);
+               if (m == numBytes) {
+                  int match = 1;
+                  char outputString[MAX];
+
+                  for (int i = 0; i < numBytes; i++) {
+                     if (destuffedBytes[i] != dataBytes[i]) {
+                        match = 0;
+                        break;
+                     }
+                     outputString[i] = (char)destuffedBytes[i];
+                  }
+                  outputString[numBytes] = '\0';
+
+                  if (match) {
+                     printf("\nSuccess: Verification check passed.\n");
+                     printf("Output String: %s\n", outputString);
+                  } else {
+                     printf("\nError: Integrity check failed. Content mismatch.\n");
+                  }
+               } else {
+                  printf("\nError: Size validation failed after destuffing.\n");
+               }
+            }
+            break;
+         }
+
+         case 2: {
+            int inputLen;
+            int manualFramed[MAX * 2];
+            printf("\n--- MODE 2: Manual Byte Stream Input ---\n");
+            printf("Stream size (bytes): ");
+            if (scanf("%d", &inputLen) != 1 || inputLen <= 0 || inputLen > (MAX * 2)) {
+               printf("Error: Range or dimension invalid.\n");
+               getchar();
+               break;
+            }
+
+            printf("Enter %d space-separated decimal bytes: \n", inputLen);
+            for (int i = 0; i < inputLen; i++) {
+               scanf("%d", &manualFramed[i]);
+            }
+            getchar(); // Clear raw buffer
+
+            printf("\nParsing incoming byte stream...\n");
+            printByteAsBinary("Input Stream", manualFramed, inputLen);
+
+            int m = 0, error = 0;
+
+            // Check boundary flags
+            if (manualFramed[0] != flagByte || manualFramed[inputLen - 1] != flagByte) {
+               printf("\n[REJECTED] Framing Violation: Frame boundaries do not match configured standard.\n");
+               printf("Diagnostics:\n");
+               printf(" -> Target FLAG pattern: %d\n", flagByte);
+               printf(" -> Heading read: %d | Trailing read: %d\n", manualFramed[0], manualFramed[inputLen - 1]);
+               error = 1;
+               break;
+            }
+
+            // Core destuff processing loop
+            for (int i = 1; i < inputLen - 1; i++) {
+               if (manualFramed[i] == escByte) {
+                  if (i + 1 >= inputLen - 1) {
+                     printf("\n[REJECTED] Syntax Error: Dangling ESC marker located at index %d.\n", i);
+                     printf("Diagnostics:\n");
+                     printf(" -> ESC code (%d) lacks trailing literal payload byte.\n", escByte);
+                     printf(" -> Abruptly collides with end flag at index %d.\n", inputLen - 1);
+                     error = 1;
+                     break;
+                  }
+                  i++; 
+                  destuffedBytes[m++] = manualFramed[i];
+               } else if (manualFramed[i] == flagByte) {
+                  printf("\n[REJECTED] Syntax Error: Illegal raw FLAG (%d) uncovered at index %d.\n", flagByte, i);
+                  printf("Diagnostics:\n");
+                  printf(" -> Non-escaped control character broke isolation criteria inside packet stream.\n");
+                  error = 1;
+                  break;
+               } else {
+                  destuffedBytes[m++] = manualFramed[i];
+               }
+            }
+
+            if (!error) {
+               printByteAsBinary("Destuffed   ", destuffedBytes, m);
+               
+               char outputString[MAX];
+               for (int i = 0; i < m && i < (MAX - 1); i++) {
+                  outputString[i] = (char)destuffedBytes[i];
+               }
+               outputString[m < MAX ? m : MAX - 1] = '\0';
+               
+               printf("\nSuccess: Packet stream unmarshalled safely.\n");
+               printf("Output String: %s\n", outputString);
+            }
+            break;
+         }
+
+         default:
+            printf("Error: Input out of choice range. Select from menu options.\n");
+            break;
+      }
+   }
    return 0;
 }
