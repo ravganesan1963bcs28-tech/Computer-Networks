@@ -1,8 +1,10 @@
+[24bcs052@mepcolinux ex1]$cat bytes.c
 #include <stdio.h>
 #include <string.h>
 
 #define MAX 100
 
+/* Global buffers for processing stream data */
 int dataBytes[MAX];
 int dataBits[MAX * 8];
 int stuffedBytes[MAX * 2];
@@ -10,23 +12,29 @@ int framedBytes[MAX * 2];
 int destuffedBytes[MAX];
 int flagByte, escByte;
 
+/* Converts an array of 8 bits into a single integer byte value */
 int bitsToByte(int bits[]) {
    int val = 0;
-   for (int i = 0; i < 8; i++) {
-      val = val * 2 + bits[i];
+   int i;
+   for (i = 0; i < 8; i++) {
+      val = (val << 1) | bits[i];
    }
    return val;
 }
 
+/* Outputs an integer byte in its 8-bit binary representation */
 void printByteBinary(int Byte) {
-   for (int i = 7; i >= 0; i--) {
+   int i;
+   for (i = 7; i >= 0; i--) {
       printf("%d", (Byte >> i) & 1);
    }
 }
 
-void printByteAsBinary(const char * label, int ass[], int n) {
+/* Helper to iterate over an array and print its contents as binary strings */
+void printByteAsBinary(const char *label, int ass[], int n) {
+   int i;
    printf("%s: ", label);
-   for (int i = 0; i < n; i++) {
+   for (i = 0; i < n; i++) {
       printByteBinary(ass[i]);
       printf(" ");
    }
@@ -37,113 +45,118 @@ int main() {
    int fbits[8], ebits[8];
    char message[MAX];
    int choice;
+   int i; /* Universal iterator for scope safety */
 
-   printf("Enter 8-bit FLAG pattern: ");
-   for (int i = 0; i < 8; i++) {
+   printf("Enter 8 bits Flag: ");
+   for (i = 0; i < 8; i++) {
       scanf("%d", &fbits[i]);
    }
    flagByte = bitsToByte(fbits);
 
-   printf("Enter 8-bit ESC pattern: ");
-   for (int i = 0; i < 8; i++) {
+   printf("Enter 8 bits ESC: ");
+   for (i = 0; i < 8; i++) {
       scanf("%d", &ebits[i]);
    }
    escByte = bitsToByte(ebits);
-   getchar(); // Consume trailing newline
+   getchar(); /* Clear trailing newline from buffer */
 
    while (1) {
-      printf("\n=== CONTROL MENU ===\n");
-      printf("1. Standard String Transmission\n");
-      printf("2. Manual Byte Stream (Framing Error Test)\n");
-      printf("3. Exit System\n");
-      printf("Select option: ");
+      printf("\n Menu \n");
+      printf("1. Standard String Transmission \n");
+      printf("2. Manual Byte Stream Input (Test Corrupt Framing Errors)\n");
+      printf("3. Exit\n");
+      printf("Enter your choice: ");
 
       if (scanf("%d", &choice) != 1) {
-         printf("Error: Invalid numeric input. Exiting.\n");
+         printf("Invalid input type. Exiting.\n");
          break;
       }
-      getchar(); // Clear raw newline
+      getchar(); /* Flush trailing newline */
 
       if (choice == 3) {
-         printf("\nShutting down system. Goodbye.\n");
+         printf("\nExiting program. Goodbye!\n");
          break;
       }
 
       switch (choice) {
          case 1: {
-            printf("\n--- MODE 1: Standard String Transmission ---\n");
-            printf("Enter text message: ");
+            int numBytes, bitIdx, stuffedLen, framedLen, m, error, match;
+            int b;
+            int j_idx, k_idx;
+
+            printf("\n Case 1: Standard String Transmission \n");
+            printf("Enter Message: ");
             fgets(message, sizeof(message), stdin);
             message[strcspn(message, "\n")] = '\0';
 
-            int numBytes = strlen(message);
-            int bitIdx = 0;
+            numBytes = (int)strlen(message);
+            bitIdx = 0;
 
-            // Convert characters to bits
-            for (int i = 0; i < numBytes; i++) {
+            /* Parse plain string text characters into raw bit structures */
+            for (i = 0; i < numBytes; i++) {
                int asciiVal = (int)message[i];
-               for (int b = 7; b >= 0; b--) {
+               for (b = 7; b >= 0; b--) {
                   dataBits[bitIdx++] = (asciiVal >> b) & 1;
                }
             }
 
-            // Internal conversion back to dataBytes
-            for (int i = 0; i < numBytes; i++) {
+            /* Map chunks of 8 bits safely back into single data byte variables */
+            for (i = 0; i < numBytes; i++) {
                int tmp[8];
-               for (int b = 0; b < 8; b++) {
+               for (b = 0; b < 8; b++) {
                   tmp[b] = dataBits[i * 8 + b];
                }
                dataBytes[i] = bitsToByte(tmp);
             }
 
-            printf("\nSystem Configuration:\n");
-            printf("  FLAG -> "); printByteBinary(flagByte); printf("\n");
-            printf("  ESC  -> "); printByteBinary(escByte);  printf("\n\n");
+            printf("\nFLAG: "); printByteBinary(flagByte); printf("\n");
+            printf("ESC:  "); printByteBinary(escByte);  printf("\n\n");
 
-            printByteAsBinary(" Raw Payload", dataBytes, numBytes);
+            printByteAsBinary("Original Data", dataBytes, numBytes);
 
-            // Stuffing Process
-            int j = 0;
-            for (int i = 0; i < numBytes; i++) {
+            /* Byte stuffing implementation loop */
+            j_idx = 0;
+            for (i = 0; i < numBytes; i++) {
                if (dataBytes[i] == flagByte || dataBytes[i] == escByte) {
-                  stuffedBytes[j++] = escByte;
-                  stuffedBytes[j++] = dataBytes[i];
+                  stuffedBytes[j_idx++] = escByte;
+                  stuffedBytes[j_idx++] = dataBytes[i];
                } else {
-                  stuffedBytes[j++] = dataBytes[i];
+                  stuffedBytes[j_idx++] = dataBytes[i];
                }
             }
-            int stuffedLen = j;
-            printByteAsBinary("Stuffed Data", stuffedBytes, stuffedLen);
+            stuffedLen = j_idx;
+            printByteAsBinary("Stuffed Data ", stuffedBytes, stuffedLen);
 
-            // Framing Process
-            int k = 0;
-            framedBytes[k++] = flagByte;
-            for (int i = 0; i < stuffedLen; i++) {
-               framedBytes[k++] = stuffedBytes[i];
+            /* Frame boundary isolation layer injection */
+            k_idx = 0;
+            framedBytes[k_idx++] = flagByte;
+            for (i = 0; i < stuffedLen; i++) {
+               framedBytes[k_idx++] = stuffedBytes[i];
             }
-            framedBytes[k++] = flagByte;
-            int framedLen = k;
+            framedBytes[k_idx++] = flagByte;
+            framedLen = k_idx;
 
-            printByteAsBinary("Framed Frame", framedBytes, framedLen);
+            printByteAsBinary("Framed Data  ", framedBytes, framedLen);
 
-            // Destuffing Process
-            int m = 0, error = 0;
+            /* Boundary syntax verification tracking */
+            m = 0;
+            error = 0;
             if (framedBytes[0] != flagByte || framedBytes[framedLen - 1] != flagByte) {
-               printf("\n[REJECTED] Error: Frame lacks start/end boundary flags.\n");
+               printf("\n[DISCARDED] ERROR: Frame Missing Start/End Delimiter Flags\n");
                break;
             }
 
-            for (int i = 1; i < framedLen - 1; i++) {
+            for (i = 1; i < framedLen - 1; i++) {
                if (framedBytes[i] == escByte) {
                   if (i + 1 >= framedLen - 1) {
-                     printf("\n[REJECTED] Protocol Error: Dangling ESC byte detected at terminal index.\n");
+                     printf("\n[DISCARDED] ERROR: Dangling ESC byte detected without an escaped following payload byte.\n");
                      error = 1;
                      break;
                   }
                   i++;
                   destuffedBytes[m++] = framedBytes[i];
                } else if (framedBytes[i] == flagByte) {
-                  printf("\n[REJECTED] Protocol Error: Unescaped raw FLAG detected in data zone.\n");
+                  printf("\n[DISCARDED] ERROR: Unexpected raw FLAG byte found unescaped inside payload zone.\n");
                   error = 1;
                   break;
                } else {
@@ -152,12 +165,12 @@ int main() {
             }
 
             if (!error) {
-               printByteAsBinary("Destuffed   ", destuffedBytes, m);
+               printByteAsBinary("Destuffed Data", destuffedBytes, m);
                if (m == numBytes) {
-                  int match = 1;
+                  match = 1;
                   char outputString[MAX];
 
-                  for (int i = 0; i < numBytes; i++) {
+                  for (i = 0; i < numBytes; i++) {
                      if (destuffedBytes[i] != dataBytes[i]) {
                         match = 0;
                         break;
@@ -167,13 +180,13 @@ int main() {
                   outputString[numBytes] = '\0';
 
                   if (match) {
-                     printf("\nSuccess: Verification check passed.\n");
-                     printf("Output String: %s\n", outputString);
+                     printf("\nDestuffing successful!\n");
+                     printf("Received Message : %s\n", outputString);
                   } else {
-                     printf("\nError: Integrity check failed. Content mismatch.\n");
+                     printf("\nMismatch after Destuffing\n");
                   }
                } else {
-                  printf("\nError: Size validation failed after destuffing.\n");
+                  printf("\nLength mismatch after destuffing\n");
                }
             }
             break;
@@ -182,52 +195,55 @@ int main() {
          case 2: {
             int inputLen;
             int manualFramed[MAX * 2];
-            printf("\n--- MODE 2: Manual Byte Stream Input ---\n");
-            printf("Stream size (bytes): ");
+            int m = 0;
+            int error = 0;
+
+            printf("\n Case 2: Manual Byte Stream Input Mode \n");
+            printf("How many bytes? ");
             if (scanf("%d", &inputLen) != 1 || inputLen <= 0 || inputLen > (MAX * 2)) {
-               printf("Error: Range or dimension invalid.\n");
+               printf("Invalid length entered.\n");
                getchar();
                break;
             }
 
-            printf("Enter %d space-separated decimal bytes: \n", inputLen);
-            for (int i = 0; i < inputLen; i++) {
+            printf("Enter the %d integer values\n", inputLen);
+            for (i = 0; i < inputLen; i++) {
                scanf("%d", &manualFramed[i]);
             }
-            getchar(); // Clear raw buffer
+            getchar(); /* Flush internal buffer space */
 
-            printf("\nParsing incoming byte stream...\n");
-            printByteAsBinary("Input Stream", manualFramed, inputLen);
+            printf("\nProcessing manual byte stream...\n");
+            printByteAsBinary("Input Stream Data", manualFramed, inputLen);
 
-            int m = 0, error = 0;
-
-            // Check boundary flags
+            /* Frame perimeter layout analysis */
             if (manualFramed[0] != flagByte || manualFramed[inputLen - 1] != flagByte) {
-               printf("\n[REJECTED] Framing Violation: Frame boundaries do not match configured standard.\n");
-               printf("Diagnostics:\n");
-               printf(" -> Target FLAG pattern: %d\n", flagByte);
-               printf(" -> Heading read: %d | Trailing read: %d\n", manualFramed[0], manualFramed[inputLen - 1]);
-               error = 1;
+               printf("\n[DISCARDED] Framing Failure: Missing correct Start or End boundary marker!\n");
+               printf("Detailed Description:\n");
+               printf(" -> Expected Flag Byte decimal value: %d\n", flagByte);
+               printf(" -> First stream element: %d, Last stream element: %d\n", manualFramed[0], manualFramed[inputLen - 1]);
+               printf(" -> Framing Rules dictate frames must start and conclude exactly with the specified control Flag.\n");
                break;
             }
 
-            // Core destuff processing loop
-            for (int i = 1; i < inputLen - 1; i++) {
+            /* Primary deconstruction loop processing logic */
+            for (i = 1; i < inputLen - 1; i++) {
                if (manualFramed[i] == escByte) {
                   if (i + 1 >= inputLen - 1) {
-                     printf("\n[REJECTED] Syntax Error: Dangling ESC marker located at index %d.\n", i);
-                     printf("Diagnostics:\n");
-                     printf(" -> ESC code (%d) lacks trailing literal payload byte.\n", escByte);
-                     printf(" -> Abruptly collides with end flag at index %d.\n", inputLen - 1);
+                     printf("\n[DISCARDED] Protocol Failure: Dangling ESC byte detected at index %d!\n", i);
+                     printf("Detailed Description:\n");
+                     printf(" -> An ESC control marker (%d) was found parsing payload, but it lacks a following data byte.\n", escByte);
+                     printf(" -> It directly hits the trailing frame flag boundary at index %d.\n", inputLen - 1);
+                     printf(" -> This corrupt structure violates byte-stuffing syntax rules and cannot be unescaped.\n");
                      error = 1;
                      break;
                   }
-                  i++; 
+                  i++;
                   destuffedBytes[m++] = manualFramed[i];
                } else if (manualFramed[i] == flagByte) {
-                  printf("\n[REJECTED] Syntax Error: Illegal raw FLAG (%d) uncovered at index %d.\n", flagByte, i);
-                  printf("Diagnostics:\n");
-                  printf(" -> Non-escaped control character broke isolation criteria inside packet stream.\n");
+                  printf("\n[DISCARDED] Protocol Failure: Unexpected raw FLAG byte found unescaped at index %d!\n", i);
+                  printf("Detailed Description:\n");
+                  printf(" -> A FLAG control marker (%d) was discovered directly inside the data region.\n", flagByte);
+                  printf(" -> Because it was not preceded by an ESC marker, it breaks framing specifications.\n");
                   error = 1;
                   break;
                } else {
@@ -236,24 +252,151 @@ int main() {
             }
 
             if (!error) {
-               printByteAsBinary("Destuffed   ", destuffedBytes, m);
-               
-               char outputString[MAX];
-               for (int i = 0; i < m && i < (MAX - 1); i++) {
-                  outputString[i] = (char)destuffedBytes[i];
-               }
-               outputString[m < MAX ? m : MAX - 1] = '\0';
-               
-               printf("\nSuccess: Packet stream unmarshalled safely.\n");
-               printf("Output String: %s\n", outputString);
+               printf("\nNo syntax violations encountered.\n");
+               printByteAsBinary("Destuffed Data", destuffedBytes, m);
             }
             break;
          }
 
-         default:
-            printf("Error: Input out of choice range. Select from menu options.\n");
+         default: {
+            printf("Invalid selection option. Please try again.\n");
             break;
+         }
       }
    }
+
    return 0;
 }
+[24bcs052@mepcolinux ex1]$./a.out
+Enter 8 bits Flag: 0 1 0 0 0 0 0 1
+Enter 8 bits ESC: 0 1 0 0 0 0 1 0
+
+ Menu
+1. Standard String Transmission
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: 1
+
+ Case 1: Standard String Transmission
+Enter Message: hello
+
+FLAG: 01000001
+ESC:  01000010
+
+Original Data: 01101000 01100101 01101100 01101100 01101111
+Stuffed Data : 01101000 01100101 01101100 01101100 01101111
+Framed Data  : 01000001 01101000 01100101 01101100 01101100 01101111 01000001
+Destuffed Data: 01101000 01100101 01101100 01101100 01101111
+
+Destuffing successful!
+Received Message : hello
+
+ Menu
+1. Standard String Transmission
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: 1
+
+ Case 1: Standard String Transmission
+Enter Message: Apple
+
+FLAG: 01000001
+ESC:  01000010
+
+Original Data: 01000001 01110000 01110000 01101100 01100101
+Stuffed Data : 01000010 01000001 01110000 01110000 01101100 01100101
+Framed Data  : 01000001 01000010 01000001 01110000 01110000 01101100 01100101 01000001
+Destuffed Data: 01000001 01110000 01110000 01101100 01100101
+
+Destuffing successful!
+Received Message : Apple
+
+ Menu
+1. Standard String Transmission
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: 1
+
+ Case 1: Standard String Transmission
+Enter Message: AB
+
+FLAG: 01000001
+ESC:  01000010
+
+Original Data: 01000001 01000010
+Stuffed Data : 01000010 01000001 01000010 01000010
+Framed Data  : 01000001 01000010 01000001 01000010 01000010 01000001
+Destuffed Data: 01000001 01000010
+
+Destuffing successful!
+Received Message : AB
+
+ Menu
+1. Standard String Transmission
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: 2
+
+ Case 2: Manual Byte Stream Input Mode
+How many bytes? 5
+Enter the 5 integer values
+65 104 105 116 65
+
+Processing manual byte stream...
+Input Stream Data: 01000001 01101000 01101001 01110100 01000001
+
+No syntax violations encountered.
+Destuffed Data: 01101000 01101001 01110100
+
+ Menu
+1. Standard String Transmission
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: 4
+Invalid selection option. Please try again.
+
+ Menu
+1. Standard String Transmission
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: 65 104 105 99
+Invalid selection option. Please try again.
+
+ Menu
+1. Standard String Transmission
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: Invalid selection option. Please try again.
+
+ Menu
+1. Standard String Transmission
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: Invalid selection option. Please try again.
+
+ Menu
+1. Standard String Transmission
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: Invalid selection option. Please try again.
+
+ Menu
+1. Standard String Transmission
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: 2
+
+ Case 2: Manual Byte Stream Input Mode
+How many bytes? 4
+Enter the 4 integer values
+65 104 66 65
+
+Processing manual byte stream...
+Input Stream Data: 01000001 01101000 01000010 01000001
+
+[DISCARDED] Protocol Failure: Dangling ESC byte detected at index 2!
+Detailed Description:
+ -> An ESC control marker (66) was found parsing payload, but it lacks a following data byte.
+ -> It directly hits the trailing frame flag boundary at index 3.
+ -> This corrupt structure violates byte-stuffing syntax rules and cannot be unescaped.
+
