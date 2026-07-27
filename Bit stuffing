@@ -192,3 +192,57 @@ int main() {
 
     return 0;
 }
+[24bcs052@mepcolinux ex1]$[24bcs052@mepcolinux ex1]$
+[24bcs052@mepcolinux ex1]$cc bits.c
+[24bcs052@mepcolinux ex1]$./a.out
+ Menu 
+1. Standard String Transmission
+2. Manual Binary Input
+3. Exit
+Enter your choice : 1
+
+Case 1: Standard String Transmission ---
+enter a string: ~~
+original data: 0111111001111110
+stuffed:        011111010011111010
+framed:         0111111001111101001111101001111110
+destuffed:      0111111001111110
+output string: ~~
+Menu 
+1. Standard String Transmission
+2. Manual Binary Input 
+3. Exit
+Enter your choice : 2
+
+ Case 2: Manual Binary Input Mode 
+Enter raw binary stream to destuff: 01111110
+
+Processing your binary stream...
+Input stream:   01111110
+
+[FRAME DISCARDED]
+Error Type: Bit-Stuffing Violation Detected
+Details:
+ - 5 consecutive 1-bits ended at index: 5
+ - HDLC Rule: Next bit (index 6) MUST be a stuffed '0'
+ - Received: '1' instead of '0'
+Action: Current frame corrupted and discarded.
+Menu: 
+1. Standard String Transmission
+2. Manual Binary Input (Test Invalid Stuffing Error)
+3. Exit
+Enter your choice : 2
+
+Case 2: Manual Binary Input Mode
+Enter raw binary stream to destuff: 01111101
+
+Processing your binary stream...
+Input stream:   01111101
+destuffed:      0111111
+Menu 
+1. Standard String Transmission
+2. Manual Binary Input (Test Invalid Stuffing Error)
+3. Exit
+Enter your choice : 3
+
+Exiting..
