@@ -191,3 +191,21 @@ int main() {
 
     return 0;
 }
+___ Menu ___
+1. Standard String Transmission 
+2. Manual Binary Input (Test Invalid Stuffing Error)
+3. Exit
+Enter your choice : 1
+
+--- Case 1: Standard String Transmission ---
+enter a string: hi
+original data: 0110100001101001
+stuffed:        0110100001101001
+framed:         01111110011010000110100101111110
+destuffed:      0110100001101001
+output string: hi
+___ Menu ___
+1. Standard String Transmission 
+2. Manual Binary Input (Test Invalid Stuffing Error)
+3. Exit
+Enter your choice : 
