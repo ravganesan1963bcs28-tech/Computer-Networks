@@ -270,3 +270,49 @@ int main() {
       }
       return 0;
 }
+--- Menu ---
+1. Standard String Transmission 
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: 1
+
+--- Case 1: Standard String Transmission ---
+Enter Message: A~B
+
+FLAG: 01111110
+ESC:  01111101
+
+Original Data: 01000001 01111110 01000010 
+Stuffed Data : 01000001 01111101 01111110 01000010 
+Framed Data  : 01111110 01000001 01111101 01111110 01000010 01111110 
+Destuffed Data: 01000001 01111110 01000010 
+
+Destuffing successful!
+Received Message : A~B
+
+--- Menu ---
+1. Standard String Transmission 
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: 2
+
+--- Case 2: Manual Byte Stream Input Mode ---
+How many bytes? 4
+Enter the 4 integer values
+99 65 66 99
+
+Processing manual byte stream...
+Input Stream Data: 01100011 01000001 01000010 01100011 
+
+[DISCARDED] Framing Failure: Missing correct Start or End boundary marker!
+Detailed Description:
+ -> Expected Flag Byte decimal value: 126
+ -> First stream element: 99, Last stream element: 99
+ -> Framing Rules dictate frames must start and conclude exactly with the specified control Flag.
+--- Menu ---
+1. Standard String Transmission 
+2. Manual Byte Stream Input (Test Corrupt Framing Errors)
+3. Exit
+Enter your choice: 3
+
+Exiting program. Goodbye!
