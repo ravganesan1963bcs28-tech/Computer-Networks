@@ -1,4 +1,6 @@
+#include <stdio.h>
 #include <stdlib.h>
+
 int compareInts(const void* a, const void* b) {
     int va = *(const int*)a;
     int vb = *(const int*)b;
@@ -7,7 +9,6 @@ int compareInts(const void* a, const void* b) {
 
 int findMaximumXOR(int* nums, int numsSize) {
     if (numsSize < 2) return 0;
-
     int maxXOR = 0;
     int mask = 0;
     int* prefixes = (int*)malloc(numsSize * sizeof(int));
@@ -22,12 +23,10 @@ int findMaximumXOR(int* nums, int numsSize) {
         int right = numsSize - 1;
         while (left <= right) {
             int currentXOR = prefixes[left] ^ prefixes[right];
-
             if (currentXOR == greedyCandidate) {
-                maxXOR = greedyCandidate; 
+                maxXOR = greedyCandidate;
                 break;
             }
-            
             if (prefixes[left] < (prefixes[right] ^ greedyCandidate)) {
                 left++;
             } else {
@@ -35,7 +34,18 @@ int findMaximumXOR(int* nums, int numsSize) {
             }
         }
     }
-
     free(prefixes);
     return maxXOR;
 }
+
+int main() {
+    int bug_trigger[] = {14, 11, 29, 21, 26};
+    int size = sizeof(bug_trigger) / sizeof(bug_trigger[0]);
+
+    printf("Your algorithm's output: %d\n", findMaximumXOR(bug_trigger, size));
+    printf("Correct target output   : 30\n");
+    return 0;
+}
+
+Your algorithm's output: 24
+Correct target output   : 28
