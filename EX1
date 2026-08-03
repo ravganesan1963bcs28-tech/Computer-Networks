@@ -353,3 +353,66 @@ int main() {
     }
     return 0;
 }
+=== STUFFING SIMULATOR INTERFACE ===
+1. Bit Stuffing & Framing
+2. Byte Stuffing & Framing
+3. Exit System
+Enter selection: 1
+
+--- BIT STUFFING CONFIGURATION ---
+Enter data input string: munees
+
+--- TRANSMITTER SIDE ---
+Input String : munees
+Original Bin : 011011010111010101101110011001010110010101110011
+Stuffed Bin  : 011011010111010101101110011001010110010101110011
+Framed Bin   : 0111111001101101011101010110111001100101011001010111001101111110
+
+Do you want to flip a bit to simulate an error? (1=Yes, 0=No): 1
+Enter bit index to flip (0 to 63): 53
+Corrupted Bin: 0111111001101101011101010110111001100101011001010111011101111110
+
+--- RECEIVER SIDE ---
+Actual data:    0111111001101101011101010110111001100101011001010111001101111110
+Changed data:   0111111001101101011101010110111001100101011001010111011101111110
+Both don't match, so message discarded.
+
+=== STUFFING SIMULATOR INTERFACE ===
+1. Bit Stuffing & Framing
+2. Byte Stuffing & Framing
+3. Exit System
+Enter selection: 2
+
+--- BYTE STUFFING CONFIGURATION ---
+Enter Start of Frame (1 for default 01111110): 01111110
+Enter End of Frame (1 for default 01111110): 01111110
+Enter Escape byte (8 bits): 01111110
+Enter data input string: munees
+
+Do you want to inject a special byte into the data for testing? (1=Yes, 0=No): 1
+Inject which byte? (1=SOF, 2=EOF, 3=ESC): 1
+Enter position in data (0 to 5): 3
+Inject another? (1=Yes, 0=No): 1
+Inject which byte? (1=SOF, 2=EOF, 3=ESC): 2
+Enter position in data (0 to 5): 0
+Inject another? (1=Yes, 0=No): 0
+
+--- TRANSMITTER SIDE ---
+SOF = 01111110
+EOF = 01111110
+ESC = 01111110
+Original data: 011111100111010101101110011111100110010101110011
+Stuffed data : 0111111001111110011101010110111001111110011111100110010101110011
+Framed data  : 01111110011111100111111001110101011011100111111001111110011001010111001101111110
+
+--- TRANSMITTER SIDE BYTE SEPARATION  ---
+Byte 0: 01111110 (SOF Flag)
+Byte 1: 01111110 (ESC Byte)
+Byte 2: 01111110 (ESC Byte)
+Byte 3: 01110101
+Byte 4: 01101110
+Byte 5: 01111110 (ESC Byte)
+Byte 6: 01111110 (ESC Byte)
+Byte 7: 01100101
+Byte 8: 01110011
+Byte 9: 01111110 (EOF Flag)
