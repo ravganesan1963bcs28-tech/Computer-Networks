@@ -1,0 +1,35 @@
+#include <stdio.h>
+#include <stdbool.h>
+
+bool hasAlternatingBits(int n) {
+    /*
+     * Step 1: XOR n with n shifted right by 1 bit.
+     * Example: n = 10101
+     *          n >> 1 = 01010
+     *          XOR     = 11111
+     */
+    unsigned int temp = n ^ (n >> 1);
+
+    /*
+     * Step 2: Check whether temp contains all 1s.
+     * If temp = 11111:
+     * temp + 1 = 100000
+     * 11111 & 100000 = 00000
+     */
+    return (temp & (temp + 1)) == 0;
+}
+
+int main() {
+    int test_num1 = 5;  // Binary: 101 (Alternating)
+    int test_num2 = 7;  // Binary: 111 (Not alternating)
+
+    printf("Number %d has alternating bits? %s\n",
+           test_num1,
+           hasAlternatingBits(test_num1) ? "true" : "false");
+
+    printf("Number %d has alternating bits? %s\n",
+           test_num2,
+           hasAlternatingBits(test_num2) ? "true" : "false");
+
+    return 0;
+}
