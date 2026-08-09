@@ -1,0 +1,143 @@
+```c
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+// Function prototypes
+int count_ones(const char *str);
+void sender(const char *data, char *frame, int parity_mode);
+void receiver(const char *frame, int parity_mode);
+
+int main() {
+    char data[100];
+    char frame[102];
+    int parity_mode = 1;
+    int choice;
+
+    printf("=== 1D Parity Error Detection Lab Simulation ===\n");
+    printf("Enter binary data (max 99 bits): ");
+    scanf("%99s", data);
+
+    // Validate binary input
+    for (int i = 0; data[i] != '\0'; i++) {
+        if (data[i] != '0' && data[i] != '1') {
+            printf("Error: Invalid binary input. Only 0 and 1 allowed.\n");
+            return 1;
+        }
+    }
+
+    // Select Parity Type
+    printf("\n--- Select Parity Configuration ---\n");
+    printf("1. Even Parity\n");
+    printf("2. Odd Parity\n");
+    printf("Select choice (1/2): ");
+    scanf("%d", &parity_mode);
+
+    if (parity_mode != 1 && parity_mode != 2) {
+        printf("Invalid configuration selection.\n");
+        return 1;
+    }
+
+    // 1. Sender Phase
+    sender(data, frame, parity_mode);
+
+    // 2. Channel Simulation Phase
+    printf("\n--- Channel Simulation Options ---\n");
+    printf("1. Transmit without errors\n");
+    printf("2. Inject a 1-bit error (Should be detected)\n");
+    printf("Select option (1/2): ");
+    scanf("%d", &choice);
+
+    if (choice == 2) {
+        // Flip the first bit
+        frame[0] = (frame[0] == '0') ? '1' : '0';
+        printf("[Channel] 1-bit error injected at index 0.\n");
+    } else {
+        printf("[Channel] Transmitting frame perfectly.\n");
+    }
+
+    // 3. Receiver Phase
+    receiver(frame, parity_mode);
+
+    return 0;
+}
+
+// Counts the number of '1's in a string
+int count_ones(const char *str) {
+    int count = 0;
+
+    while (*str) {
+        if (*str == '1') {
+            count++;
+        }
+        str++;
+    }
+
+    return count;
+}
+
+// Appends parity bit based on selected mode
+void sender(const char *data, char *frame, int parity_mode) {
+    int ones = count_ones(data);
+    char parity_bit;
+
+    if (parity_mode == 1) {
+        // Even Parity: Make total 1s even
+        parity_bit = (ones % 2 == 0) ? '0' : '1';
+    } else {
+        // Odd Parity: Make total 1s odd
+        parity_bit = (ones % 2 == 0) ? '1' : '0';
+    }
+
+    // Construct the frame
+    strcpy(frame, data);
+
+    int len = strlen(frame);
+
+    frame[len] = parity_bit;
+    frame[len + 1] = '\0';
+
+    printf("\n--- Sender Side ---\n");
+    printf("Original Data:     %s\n", data);
+    printf("Ones Count:        %d\n", ones);
+    printf("Parity Mode:       %s\n",
+           (parity_mode == 1) ? "EVEN" : "ODD");
+    printf("Generated Parity:  %c\n", parity_bit);
+    printf("Transmitted Frame: %s\n", frame);
+}
+
+// Checks the frame against selected parity mode
+void receiver(const char *frame, int parity_mode) {
+    int len = strlen(frame);
+
+    printf("\n--- Receiver Side ---\n");
+    printf("Received Frame:    %s\n", frame);
+    printf("Checking Mode:     %s\n",
+           (parity_mode == 1) ? "EVEN" : "ODD");
+
+    int total_ones = count_ones(frame);
+    int is_valid = 0;
+
+    if (parity_mode == 1) {
+        // For Even Parity, total ones must be even
+        is_valid = (total_ones % 2 == 0);
+    } else {
+        // For Odd Parity, total ones must be odd
+        is_valid = (total_ones % 2 != 0);
+    }
+
+    if (is_valid) {
+        printf("Verification:      PASS\n");
+        printf("Result:            No error detected.\n");
+
+        char extracted_data[100];
+
+        strncpy(extracted_data, frame, len - 1);
+        extracted_data[len - 1] = '\0';
+
+        printf("Extracted Data:    %s\n", extracted_data);
+    } else {
+        printf("Verification:      FAIL\n");
+        printf("Result:            Error detected! Parity mismatch.\n");
+    }
+}
