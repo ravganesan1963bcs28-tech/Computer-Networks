@@ -1,0 +1,77 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+int compare(const void* a, const void* b) {
+    return (*(int*)a - *(int*)b);
+}
+
+int subarrayBitwiseORs(int* arr, int arrSize) {
+    if (arrSize == 0)
+        return 0;
+
+    // Stores all unique overall results found so far
+    int* ans = (int*)malloc(arrSize * 32 * sizeof(int));
+    int ans_size = 0;
+
+    // Stores unique OR results ending at the current index
+    int cur[32];
+    int cur_size = 0;
+
+    for (int i = 0; i < arrSize; i++) {
+        int next_cur[32];
+        int next_cur_size = 0;
+
+        // Subarray starting and ending at index i
+        next_cur[next_cur_size++] = arr[i];
+
+        // Extend previous subarrays with arr[i]
+        for (int j = 0; j < cur_size; j++) {
+            int or_val = cur[j] | arr[i];
+
+            // Add only if it is not a duplicate
+            if (next_cur_size == 0 ||
+                next_cur[next_cur_size - 1] != or_val) {
+                next_cur[next_cur_size++] = or_val;
+            }
+        }
+
+        // Copy next_cur into cur
+        cur_size = next_cur_size;
+
+        for (int j = 0; j < cur_size; j++) {
+            cur[j] = next_cur[j];
+            ans[ans_size++] = cur[j];
+        }
+    }
+
+    // Sort the results
+    qsort(ans, ans_size, sizeof(int), compare);
+
+    // Count unique results
+    int unique_count = 0;
+
+    if (ans_size > 0) {
+        unique_count = 1;
+
+        for (int i = 1; i < ans_size; i++) {
+            if (ans[i] != ans[i - 1]) {
+                unique_count++;
+            }
+        }
+    }
+
+    free(ans);
+
+    return unique_count;
+}
+
+int main() {
+    int arr[] = {1, 2, 4};
+    int size = sizeof(arr) / sizeof(arr[0]);
+
+    int result = subarrayBitwiseORs(arr, size);
+
+    printf("Number of unique subarray bitwise ORs: %d\n", result);
+
+    return 0;
+}
