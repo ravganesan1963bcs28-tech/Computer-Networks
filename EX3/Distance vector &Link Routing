@@ -417,3 +417,50 @@ int main()
 
     return 0;
 }
+
+
+void modifyEdgeCost(int n, int graph[MAX][MAX]) {
+    int startNode, endNode, cost;
+    int state = 0; // State 0 = Start, State 1 = Source OK, State 2 = Dest OK, State 3 = Done
+
+    printf("\n--- DIJKSTRA TOPOLOGY DFA UPDATE ---\n");
+
+    while (state != 3) {
+        switch (state) {
+            case 0: // State 0: Get and verify the starting node
+                printf("Enter starting node: ");
+                scanf("%d", &startNode);
+                
+                if (startNode >= 1 && startNode <= n) {
+                    state = 1; // Transition to next state
+                } else {
+                    printf("Invalid node. Stay in current state.\n");
+                }
+                break;
+
+            case 1: // State 1: Get and verify the destination node
+                printf("Enter destination node: ");
+                scanf("%d", &endNode);
+                
+                if (endNode >= 1 && endNode <= n && endNode != startNode) {
+                    state = 2; // Transition to next state
+                } else {
+                    printf("Invalid node or self-loop. Resetting to State 0.\n");
+                    state = 0; // Fallback reset transition
+                }
+                break;
+
+            case 2: // State 2: Get cost and apply updates to the matrix
+                printf("Enter new connection cost: ");
+                scanf("%d", &cost);
+
+                // Update the matrix block read by Dijkstra
+                graph[startNode - 1][endNode - 1] = cost;
+                graph[endNode - 1][startNode - 1] = cost;
+
+                printf("Topology updated successfully!\n");
+                state = 3; // Final state to break the loop
+                break;
+        }
+    }
+}
