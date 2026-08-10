@@ -1,0 +1,1072 @@
+[24bcs052@mepcolinux ex2]$cat ex2.prn
+Script started on Mon Aug 10 11:07:05 2026
+[24bcs052@mepcolinux ex2]$cat checksum1.c
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define SEGMENT_SIZE 8
+
+unsigned char generate_block_checksum(const char *data_stream, int total_blocks) {
+    unsigned long running_total = 0;
+    char sub_block[SEGMENT_SIZE + 1];
+    int i;
+
+    for (i = 0; i < total_blocks; i++) {
+        strncpy(sub_block, data_stream + (i * SEGMENT_SIZE), SEGMENT_SIZE);
+        sub_block[SEGMENT_SIZE] = '\0';
+        unsigned long block_numeric = strtoul(sub_block, NULL, 2);
+        running_total += block_numeric;
+
+        while (running_total >> 8) {
+            running_total = (running_total & 0xFF) + (running_total >> 8);
+        }
+    }
+
+    return (unsigned char)(running_total & 0xFF);
+}
+
+void convert_byte_to_bitstring(unsigned char numeric_val, char *bit_string_out) {
+    int i;
+    for (i = 7; i >= 0; i--) {
+        bit_string_out[7 - i] = (numeric_val & (1 << i)) ? '1' : '0';
+    }
+    bit_string_out[8] = '\0';
+}
+
+int main() {
+    char input_data[500];
+    char padded_data[500] = {0};
+    char checksum_str[SEGMENT_SIZE + 1];
+    char transmitted_frame[600] = {0};
+    char received_frame[600] = {0};
+    int error_indices[100];
+    int num_errors = 0;
+
+    int i, j;
+    int input_len;
+    int remainder;
+    int total_len;
+    int num_segments;
+    unsigned char sum_val;
+    unsigned char checksum_val;
+    int frame_len;
+    int receiver_segments;
+    unsigned char receiver_sum;
+    unsigned char verification_result;
+    char rec_sum_str[9];
+    char extracted_data[500] = {0};
+
+    /* Simplified Input */
+    printf("Enter binary data: ");
+    scanf("%499s", input_data);
+
+    input_len = strlen(input_data);
+    strcpy(padded_data, input_data);
+
+    remainder = input_len % SEGMENT_SIZE;
+
+    if (remainder != 0) {
+        int padding_needed = SEGMENT_SIZE - remainder;
+
+        for (i = 0; i < padding_needed; i++) {
+            strcat(padded_data, "0");
+        }
+    }
+
+    total_len = strlen(padded_data);
+    num_segments = total_len / SEGMENT_SIZE;
+
+    /* Simplified Sender Display */
+    printf("\n--- Sender Side ---\n");
+    printf("Original Data: %s\n", input_data);
+    printf("Padded Data:   %s\n", padded_data);
+
+    for (i = 0; i < num_segments; i++) {
+        printf("  Segment %d: ", i + 1);
+        for (j = 0; j < SEGMENT_SIZE; j++) {
+            printf("%c", padded_data[i * SEGMENT_SIZE + j]);
+        }
+        printf("\n");
+    }
+
+    sum_val = generate_block_checksum(padded_data, num_segments);
+    checksum_val = (unsigned char)(~sum_val & 0xFF);
+    convert_byte_to_bitstring(checksum_val, checksum_str);
+
+    sprintf(transmitted_frame, "%s%s", padded_data, checksum_str);
+
+    printf("Checksum Bits: %s\n", checksum_str);
+    printf("Sent Data:     %s\n", transmitted_frame);
+
+    strcpy(received_frame, transmitted_frame);
+    frame_len = strlen(received_frame);
+
+    /* Simplified Error Input */
+    printf("\n--- Error Simulation ---\n");
+    printf("Enter number of bits to flip: ");
+    scanf("%d", &num_errors);
+
+    if (num_errors > 0) {
+        printf("Enter bit positions (0 to %d): ", frame_len - 1);
+
+        for (i = 0; i < num_errors; i++) {
+            scanf("%d", &error_indices[i]);
+
+            if (error_indices[i] >= 0 && error_indices[i] < frame_len) {
+                received_frame[error_indices[i]] =
+                    (received_frame[error_indices[i]] == '0') ? '1' : '0';
+            }
+        }
+        printf("Result: Flipped %d bits successfully.\n", num_errors);
+    } else {
+        printf("Result: No errors added.\n");
+    }
+
+    /* Simplified Receiver Display */
+    printf("\n--- Receiver Side ---\n");
+    printf("Received Data: %s\n", received_frame);
+
+    receiver_segments = num_segments + 1;
+    receiver_sum = generate_block_checksum(received_frame, receiver_segments);
+    verification_result = (unsigned char)(~receiver_sum & 0xFF);
+    convert_byte_to_bitstring(receiver_sum, rec_sum_str);
+
+    printf("Receiver Sum:  %s\n", rec_sum_str);
+
+    strncpy(extracted_data, received_frame, input_len);
+    extracted_data[input_len] = '\0';
+
+    /* Simplified Verdict */
+    printf("\n--- Final Status ---\n");
+    if (verification_result == 0) {
+        printf("Result: PASS - No errors found.\n");
+        printf("Output: %s\n", extracted_data);
+    } else {
+        printf("Result: FAIL - Error detected!\n");
+        printf("Output: %s (Corrupted)\n", extracted_data);
+    }
+
+    return 0;
+}
+[24bcs052@mepcolinux ex2]$./a.out
+Enter binary data: 1100110011110000
+
+--- Sender Side ---
+Original Data: 1100110011110000
+Padded Data:   1100110011110000
+  Segment 1: 11001100
+  Segment 2: 11110000
+Checksum Bits: 01000010
+Sent Data:     110011001111000001000010
+
+--- Error Simulation ---
+Enter number of bits to flip: 0
+Result: No errors added.
+
+--- Receiver Side ---
+Received Data: 110011001111000001000010
+Receiver Sum:  11111111
+
+--- Final Status ---
+Result: PASS - No errors found.
+Output: 1100110011110000
+[24bcs052@mepcolinux ex2]$./a.out
+Enter binary data: 1011
+
+--- Sender Side ---
+Original Data: 1011
+Padded Data:   10110000
+  Segment 1: 10110000
+Checksum Bits: 01001111
+Sent Data:     1011000001001111
+
+--- Error Simulation ---
+Enter number of bits to flip: 0
+Result: No errors added.
+
+--- Receiver Side ---
+Received Data: 1011000001001111
+Receiver Sum:  11111111
+
+--- Final Status ---
+Result: PASS - No errors found.
+Output: 1011
+[24bcs052@mepcolinux ex2]$./a.out
+Enter binary data: 111111110000000010101
+
+--- Sender Side ---
+Original Data: 111111110000000010101
+Padded Data:   111111110000000010101000
+  Segment 1: 11111111
+  Segment 2: 00000000
+  Segment 3: 10101000
+Checksum Bits: 01010111
+Sent Data:     11111111000000001010100001010111
+
+--- Error Simulation ---
+Enter number of bits to flip: 2
+Enter bit positions (0 to 31): 3 4
+Result: Flipped 2 bits successfully.
+
+--- Receiver Side ---
+Received Data: 11100111000000001010100001010111
+Receiver Sum:  11100111
+
+--- Final Status ---
+Result: FAIL - Error detected!
+Output: 111001110000000010101 (Corrupted)
+[24bcs052@mepcolinux ex2]$cat crc1.c
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+/* Validates that a string contains only 0s and 1s */
+int is_binary_string(const char *str) {
+    int i;
+    for (i = 0; str[i] != '\0'; i++) {
+        if (str[i] != '0' && str[i] != '1') {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* Programmatically enforces the three rules of a 'good generator' */
+int check_good_generator(const char *gen) {
+    int len = strlen(gen);
+    int one_count = 0;
+    int i;
+
+    // Rule 1: Length must be more than 2 characters
+    if (len <= 2) {
+        printf("Error: Generator must be more than 2 characters long to be effective.\n");
+        return 0;
+    }
+
+    // Rule 2: x^0 coefficient must be 1 (the final character must be '1')
+    if (gen[len - 1] != '1') {
+        printf("Error: The x^0 coefficient must be 1 (generator must end with a '1').\n");
+        return 0;
+    }
+
+    // Rule 3: Must contain (x + 1) as a factor.
+    // In modulo-2 polynomial math, if (x + 1) is a factor, substituting x = 1
+    // must result in a remainder of 0. This means the generator must have an EVEN number of '1's.
+    for (i = 0; i < len; i++) {
+        if (gen[i] == '1') {
+            one_count++;
+        }
+    }
+    if (one_count % 2 != 0) {
+        printf("Error: Generator does not contain (x + 1) as a factor (must have an even number of '1' bits).\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+void perform_crc_division(const char *input, const char *generator, char *remainder, int show_steps) {
+    int input_len = strlen(input);
+    int gen_len = strlen(generator);
+    char *temp = (char *)malloc((input_len + 1) * sizeof(char));
+    int i, j;
+
+    strcpy(temp, input);
+
+    if (show_steps) {
+        printf("\n--- Step-by-Step XOR Division ---\n");
+        printf("Initial Data: %s\n", temp);
+    }
+
+    for (i = 0; i <= input_len - gen_len; i++) {
+        if (temp[i] == '1') {
+            if (show_steps) {
+                printf("Aligning:     ");
+                for (j = 0; j < i; j++) printf(" ");
+                printf("%s\n", generator);
+            }
+
+            for (j = 0; j < gen_len; j++) {
+                temp[i + j] = (temp[i + j] == generator[j]) ? '0' : '1';
+            }
+
+            if (show_steps) {
+                printf("Current XOR:  %s\n", temp);
+            }
+        }
+    }
+
+    strncpy(remainder, temp + (input_len - gen_len + 1), gen_len - 1);
+    remainder[gen_len - 1] = '\0';
+
+    free(temp);
+}
+
+int main() {
+    char data[500], generator[100];
+    char augmented_data[600] = {0};
+    char remainder[100];
+    char transmitted_cw[600];
+    char received_cw[600];
+    char receiver_remainder[100];
+    char extracted_data[500] = {0};
+
+    int num_errors = 0;
+    int error_pos;
+    int gen_len;
+    int cw_len;
+    int is_error = 0;
+    int i;
+
+    /* Input Collection */
+    printf("Enter binary data: ");
+    scanf("%499s", data);
+    if (!is_binary_string(data)) {
+        printf("Error: Input data must only contain 0 and 1.\n");
+        return 1;
+    }
+
+    printf("Enter generator bits: ");
+    scanf("%99s", generator);
+    if (!is_binary_string(generator) || generator[0] != '1') {
+        printf("Error: Generator must be binary and start with 1.\n");
+        return 1;
+    }
+
+    /* Enforce Good Generator Conditions */
+    if (!check_good_generator(generator)) {
+        return 1;
+    }
+
+    gen_len = strlen(generator);
+
+    // --- SENDER SIDE ---
+    strcpy(augmented_data, data);
+    for (i = 0; i < gen_len - 1; i++) {
+        strcat(augmented_data, "0");
+    }
+
+    perform_crc_division(augmented_data, generator, remainder, 1);
+
+    strcpy(transmitted_cw, data);
+    strcat(transmitted_cw, remainder);
+
+    printf("\n--- Sender Side ---\n");
+    printf("Original Data: %s\n", data);
+    printf("Generator:     %s\n", generator);
+    printf("Remainder:     %s\n", remainder);
+    printf("Sent Data:     %s\n", transmitted_cw);
+
+    // --- ERROR SIMULATION ---
+    strcpy(received_cw, transmitted_cw);
+    cw_len = strlen(received_cw);
+
+    printf("\n--- Error Simulation ---\n");
+    printf("Enter number of bits to flip: ");
+    scanf("%d", &num_errors);
+
+    if (num_errors > 0) {
+        printf("Enter bit positions (0 to %d): ", cw_len - 1);
+        for (i = 0; i < num_errors; i++) {
+            scanf("%d", &error_pos);
+            if (error_pos >= 0 && error_pos < cw_len) {
+                received_cw[error_pos] = (received_cw[error_pos] == '0') ? '1' : '0';
+            }
+        }
+        printf("Result: Flipped %d bits successfully.\n", num_errors);
+    } else {
+        printf("Result: No errors added.\n");
+    }
+
+    // --- RECEIVER SIDE ---
+    perform_crc_division(received_cw, generator, receiver_remainder, 0);
+
+    for (i = 0; i < gen_len - 1; i++) {
+        if (receiver_remainder[i] == '1') {
+            is_error = 1;
+            break;
+        }
+    }
+
+    strncpy(extracted_data, received_cw, strlen(data));
+    extracted_data[strlen(data)] = '\0';
+
+    printf("\n--- Receiver Side ---\n");
+    printf("Received Data: %s\n", received_cw);
+    printf("Receiver Remainder: %s\n", receiver_remainder);
+
+    printf("\n--- Final Status ---\n");
+    if (is_error) {
+        printf("Result: FAIL - Error detected!\n");
+        printf("Output: %s (Corrupted)\n", extracted_data);
+    } else {
+        printf("Result: PASS - No errors found.\n");
+        printf("Output: %s\n", extracted_data);
+    }
+
+    return 0;
+}
+[24bcs052@mepcolinux ex2]$./a.out
+Enter binary data: 10100111
+Enter generator bits: 101
+
+--- Step-by-Step XOR Division ---
+Initial Data: 1010011100
+Aligning:     101
+Current XOR:  0000011100
+Aligning:          101
+Current XOR:  0000001000
+Aligning:           101
+Current XOR:  0000000010
+
+--- Sender Side ---
+Original Data: 10100111
+Generator:     101
+Remainder:     10
+Sent Data:     1010011110
+
+--- Error Simulation ---
+Enter number of bits to flip: 0
+Result: No errors added.
+
+--- Receiver Side ---
+Received Data: 1010011110
+Receiver Remainder: 00
+
+--- Final Status ---
+Result: PASS - No errors found.
+Output: 10100111
+[24bcs052@mepcolinux ex2]$./a.out
+Enter binary data: 1101
+Enter generator bits: 1111
+
+--- Step-by-Step XOR Division ---
+Initial Data: 1101000
+Aligning:     1111
+Current XOR:  0010000
+Aligning:       1111
+Current XOR:  0001110
+Aligning:        1111
+Current XOR:  0000001
+
+--- Sender Side ---
+Original Data: 1101
+Generator:     1111
+Remainder:     001
+Sent Data:     1101001
+
+--- Error Simulation ---
+Enter number of bits to flip: 1
+Enter bit positions (0 to 6): 2
+Result: Flipped 1 bits successfully.
+
+--- Receiver Side ---
+Received Data: 1111001
+Receiver Remainder: 001
+
+--- Final Status ---
+Result: FAIL - Error detected!
+Output: 1111 (Corrupted)
+[24bcs052@mepcolinux ex2]$cat parity1.c
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+/* Function prototypes */
+int count_ones(const char *str);
+void sender(const char *data, char *frame, int parity_mode);
+void receiver(const char *frame, int parity_mode);
+
+int main() {
+    char data[100];
+    char frame[102];
+    int parity_mode = 1;
+    int choice;
+    int i; /* Declared out of the loop for compiler compatibility */
+
+    printf("Enter binary data: ");
+    scanf("%99s", data);
+
+    /* Validate binary input */
+    for (i = 0; data[i] != '\0'; i++) {
+        if (data[i] != '0' && data[i] != '1') {
+            printf("Error: Input data must only contain 0 and 1.\n");
+            return 1;
+        }
+    }
+
+    /* Select Parity Type */
+    printf("\n--- Parity Selection ---\n");
+    printf("1. Even Parity\n");
+    printf("2. Odd Parity\n");
+    printf("Select option (1/2): ");
+    scanf("%d", &parity_mode);
+
+    if (parity_mode != 1 && parity_mode != 2) {
+        printf("Error: Invalid option chosen.\n");
+        return 1;
+    }
+
+    /* 1. Sender Phase */
+    sender(data, frame, parity_mode);
+
+    /* 2. Channel Simulation Phase */
+    printf("\n--- Error Simulation ---\n");
+    printf("1. No errors\n");
+    printf("2. Flip 1 bit\n");
+    printf("Select option (1/2): ");
+    scanf("%d", &choice);
+
+    if (choice == 2) {
+        frame[0] = (frame[0] == '0') ? '1' : '0';
+        printf("Result: Flipped 1 bit at index 0.\n");
+    } else {
+        printf("Result: No errors added.\n");
+    }
+
+    /* 3. Receiver Phase */
+    receiver(frame, parity_mode);
+
+    return 0;
+}
+
+/* Counts the number of '1's in a string */
+int count_ones(const char *str) {
+    int count = 0;
+    while (*str) {
+        if (*str == '1') {
+            count++;
+        }
+        str++;
+    }
+    return count;
+}
+
+/* Appends parity bit based on selected mode */
+void sender(const char *data, char *frame, int parity_mode) {
+    int ones = count_ones(data);
+    char parity_bit;
+    int len;
+
+    if (parity_mode == 1) {
+        parity_bit = (ones % 2 == 0) ? '0' : '1';
+    } else {
+        parity_bit = (ones % 2 == 0) ? '1' : '0';
+    }
+
+    strcpy(frame, data);
+    len = strlen(frame);
+    frame[len] = parity_bit;
+    frame[len + 1] = '\0';
+
+    printf("\n--- Sender Side ---\n");
+    printf("Original Data: %s\n", data);
+    printf("Parity Mode:   %s\n", (parity_mode == 1) ? "EVEN" : "ODD");
+    printf("Parity Bit:    %c\n", parity_bit);
+    printf("Sent Data:     %s\n", frame);
+}
+
+/* Checks the frame against selected parity mode */
+void receiver(const char *frame, int parity_mode) {
+    int len = strlen(frame);
+    int total_ones = count_ones(frame);
+    int is_valid = 0;
+    char extracted_data[100];
+
+    printf("\n--- Receiver Side ---\n");
+    printf("Received Data: %s\n", frame);
+
+    if (parity_mode == 1) {
+        is_valid = (total_ones % 2 == 0);
+    } else {
+        is_valid = (total_ones % 2 != 0);
+    }
+
+    printf("\n--- Final Status ---\n");
+    if (is_valid) {
+        printf("Result: PASS - No errors found.\n");
+        strncpy(extracted_data, frame, len - 1);
+        extracted_data[len - 1] = '\0';
+        printf("Output: %s\n", extracted_data);
+    } else {
+        printf("Result: FAIL - Error detected!\n");
+    }
+}
+Enter binary data: 1011
+
+--- Parity Selection ---
+1. Even Parity
+2. Odd Parity
+Select option (1/2): 1
+
+--- Sender Side ---
+Original Data: 1011
+Parity Mode:   EVEN
+Parity Bit:    1
+Sent Data:     10111
+
+--- Error Simulation ---
+1. No errors
+2. Flip 1 bit
+Select option (1/2): 2
+Result: Flipped 1 bit at index 0.
+
+--- Receiver Side ---
+Received Data: 00111
+
+--- Final Status ---
+Result: FAIL - Error detected!
+[24bcs052@mepcolinux ex2]$./a.out
+Enter binary data: 1000
+
+--- Parity Selection ---
+1. Even Parity
+2. Odd Parity
+Select option (1/2): 2
+
+--- Sender Side ---
+Original Data: 1000
+Parity Mode:   ODD
+Parity Bit:    0
+Sent Data:     10000
+
+--- Error Simulation ---
+1. No errors
+2. Flip 1 bit
+Select option (1/2): 2
+Result: Flipped 1 bit at index 0.
+
+--- Receiver Side ---
+Received Data: 00000
+
+--- Final Status ---
+Result: FAIL - Error detected!
+[24bcs052@mepcolinux ex2]$cd leetcode
+[24bcs052@mepcolinux leetcode]$cat l1.c
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+char* addBinary(char* a, char* b) {
+    int len_a = strlen(a);
+    int len_b = strlen(b);
+
+    // Maximum possible length + 1 for carry
+    int max_len = (len_a > len_b ? len_a : len_b) + 1;
+
+    // Allocate memory for result and null terminator
+    char* result = (char*)malloc((max_len + 1) * sizeof(char));
+    result[max_len] = '\0';
+
+    int i = len_a - 1;
+    int j = len_b - 1;
+    int k = max_len - 1;
+    int carry = 0;
+
+    // Traverse both strings from right to left
+    while (i >= 0 || j >= 0 || carry > 0) {
+        int sum = carry;
+
+        if (i >= 0) {
+            sum += a[i] - '0';
+            i--;
+        }
+
+        if (j >= 0) {
+            sum += b[j] - '0';
+            j--;
+        }
+
+        // Calculate carry and result bit
+        carry = sum / 2;
+        result[k] = (sum % 2) + '0';
+        k--;
+    }
+
+    // Remove unused leading position
+    if (k == 0) {
+        return &result[1];
+    }
+
+    return result;
+}
+
+// Simple test block for verification
+int main() {
+    char a[] = "1010";
+    char b[] = "1011";
+
+    char* sum = addBinary(a, b);
+
+    printf("Binary Sum of %s and %s is: %s\n", a, b, sum);
+
+    return 0;
+}
+[24bcs052@mepcolinux leetcode]$cat l2.c
+#include <stdio.h>
+#include <stdbool.h>
+
+bool hasAlternatingBits(int n) {
+    /*
+     * Step 1: XOR n with n shifted right by 1 bit.
+     * Example: n = 10101
+     *          n >> 1 = 01010
+     *          XOR     = 11111
+     */
+    unsigned int temp = n ^ (n >> 1);
+
+    /*
+     * Step 2: Check whether temp contains all 1s.
+     * If temp = 11111:
+     * temp + 1 = 100000
+     * 11111 & 100000 = 00000
+     */
+    return (temp & (temp + 1)) == 0;
+}
+
+int main() {
+    int test_num1 = 5;  // Binary: 101 (Alternating)
+    int test_num2 = 7;  // Binary: 111 (Not alternating)
+
+    printf("Number %d has alternating bits? %s\n",
+           test_num1,
+           hasAlternatingBits(test_num1) ? "true" : "false");
+
+    printf("Number %d has alternating bits? %s\n",
+           test_num2,
+           hasAlternatingBits(test_num2) ? "true" : "false");
+
+    return 0;
+}
+[24bcs052@mepcolinux leetcode]$cat  l3.c
+#include <stdio.h>
+#include <stdlib.h>
+
+int compare(const void* a, const void* b) {
+    return (*(int*)a - *(int*)b);
+}
+
+int subarrayBitwiseORs(int* arr, int arrSize) {
+    if (arrSize == 0)
+        return 0;
+
+    // Stores all unique overall results found so far
+    int* ans = (int*)malloc(arrSize * 32 * sizeof(int));
+    int ans_size = 0;
+
+    // Stores unique OR results ending at the current index
+    int cur[32];
+    int cur_size = 0;
+
+    for (int i = 0; i < arrSize; i++) {
+        int next_cur[32];
+        int next_cur_size = 0;
+
+        // Subarray starting and ending at index i
+        next_cur[next_cur_size++] = arr[i];
+
+        // Extend previous subarrays with arr[i]
+        for (int j = 0; j < cur_size; j++) {
+            int or_val = cur[j] | arr[i];
+
+            // Add only if it is not a duplicate
+            if (next_cur_size == 0 ||
+                next_cur[next_cur_size - 1] != or_val) {
+                next_cur[next_cur_size++] = or_val;
+            }
+        }
+
+        // Copy next_cur into cur
+        cur_size = next_cur_size;
+
+        for (int j = 0; j < cur_size; j++) {
+            cur[j] = next_cur[j];
+            ans[ans_size++] = cur[j];
+        }
+    }
+
+    // Sort the results
+    qsort(ans, ans_size, sizeof(int), compare);
+
+    // Count unique results
+    int unique_count = 0;
+
+    if (ans_size > 0) {
+        unique_count = 1;
+
+        for (int i = 1; i < ans_size; i++) {
+            if (ans[i] != ans[i - 1]) {
+                unique_count++;
+            }
+        }
+    }
+
+    free(ans);
+
+    return unique_count;
+}
+
+int main() {
+    int arr[] = {1, 2, 4};
+    int size = sizeof(arr) / sizeof(arr[0]);
+
+    int result = subarrayBitwiseORs(arr, size);
+
+    printf("Number of unique subarray bitwise ORs: %d\n", result);
+
+    return 0;
+}
+[24bcs052@mepcolinux leetcode]$cat l4.c
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define SEGMENT_SIZE 8
+
+// Function prototypes
+unsigned char compute_ones_complement_sum(const char *data, int num_segments);
+void int_to_binary_str(unsigned char val, char *output);
+
+int main() {
+    char input_data[500];
+    char padded_data[512] = {0};
+    char checksum_str[SEGMENT_SIZE + 1];
+    char transmitted_frame[600] = {0};
+    char received_frame[600] = {0};
+    int error_indices[10];
+    int num_errors = 0;
+
+    printf("=== Dynamic 8-bit Checksum Lab Simulation ===\n");
+    printf("Enter continuous binary data stream: ");
+    scanf("%499s", input_data);
+
+    // Validate input data
+    int input_len = strlen(input_data);
+
+    for (int i = 0; i < input_len; i++) {
+        if (input_data[i] != '0' && input_data[i] != '1') {
+            printf("Error: Invalid binary input. Use only 0 and 1.\n");
+            return 1;
+        }
+    }
+
+    // 1. SENDER: Divide data into fixed-size segments
+    strcpy(padded_data, input_data);
+
+    int remainder = input_len % SEGMENT_SIZE;
+
+    if (remainder != 0) {
+        int padding_needed = SEGMENT_SIZE - remainder;
+
+        for (int i = 0; i < padding_needed; i++) {
+            strcat(padded_data, "0");
+        }
+    }
+
+    int total_len = strlen(padded_data);
+    int num_segments = total_len / SEGMENT_SIZE;
+
+    printf("\n--- Sender Side ---\n");
+    printf("Padded/Structured Data into %d segments:\n", num_segments);
+
+    for (int i = 0; i < num_segments; i++) {
+        printf("  Segment %d: ", i + 1);
+
+        for (int j = 0; j < SEGMENT_SIZE; j++) {
+            printf("%c", padded_data[i * SEGMENT_SIZE + j]);
+        }
+
+        printf("\n");
+    }
+
+    // Compute checksum
+    unsigned char sum_val =
+        compute_ones_complement_sum(padded_data, num_segments);
+
+    unsigned char checksum_val =
+        (unsigned char)(~sum_val & 0xFF);
+
+    int_to_binary_str(checksum_val, checksum_str);
+
+    // Construct transmitted frame
+    sprintf(transmitted_frame, "%s%s",
+            padded_data, checksum_str);
+
+    printf("Calculated Checksum:  %s\n", checksum_str);
+    printf("Transmitted Frame:    %s\n", transmitted_frame);
+
+    // 2. CHANNEL SIMULATION
+    strcpy(received_frame, transmitted_frame);
+
+    int frame_len = strlen(received_frame);
+
+    printf("\n--- Transmission Error Simulation ---\n");
+    printf("How many bits do you want to corrupt/flip? (0 to %d): ",
+           frame_len);
+
+    scanf("%d", &num_errors);
+
+    if (num_errors > 0) {
+        printf("Enter the 0-indexed positions (from 0 to %d) to flip separated by spaces: ",
+               frame_len - 1);
+
+        for (int i = 0; i < num_errors; i++) {
+            scanf("%d", &error_indices[i]);
+
+            if (error_indices[i] >= 0 &&
+                error_indices[i] < frame_len) {
+
+                received_frame[error_indices[i]] =
+                    (received_frame[error_indices[i]] == '0')
+                    ? '1'
+                    : '0';
+            }
+        }
+
+        printf("[Channel] Successfully modified %d bit(s) inside the stream.\n",
+               num_errors);
+    } else {
+        printf("[Channel] Transmitting frame perfectly with no modifications.\n");
+    }
+
+    // 3. RECEIVER
+    printf("\n--- Receiver Side ---\n");
+    printf("Received Frame:       %s\n", received_frame);
+
+    // Include checksum segment
+    int receiver_segments = num_segments + 1;
+
+    unsigned char receiver_sum =
+        compute_ones_complement_sum(received_frame,
+                                     receiver_segments);
+
+    unsigned char verification_result =
+        (unsigned char)(~receiver_sum & 0xFF);
+
+    printf("Receiver Final Sum:   ");
+
+    char rec_sum_str[9];
+
+    int_to_binary_str(receiver_sum, rec_sum_str);
+
+    printf("%s\n", rec_sum_str);
+
+    // Verify checksum
+    if (verification_result == 0) {
+        printf("Verification:         PASS\n");
+        printf("Result:               Transmission is ERROR FREE! Data is intact.\n");
+
+        // Extract original data
+        char extracted_data[500] = {0};
+
+        strncpy(extracted_data,
+                received_frame,
+                total_len);
+
+        printf("Extracted Data:       %s\n", extracted_data);
+    } else {
+        printf("Verification:         FAIL\n");
+        printf("Result:               Transmission is CORRUPTED! Errors detected.\n");
+    }
+
+    return 0;
+}
+
+// Computes the 1's complement summation of sequential 8-bit segments
+unsigned char compute_ones_complement_sum(const char *data,
+                                           int num_segments) {
+    unsigned long sum = 0;
+    char temp_seg[SEGMENT_SIZE + 1];
+
+    for (int i = 0; i < num_segments; i++) {
+        strncpy(temp_seg,
+                data + (i * SEGMENT_SIZE),
+                SEGMENT_SIZE);
+
+        temp_seg[SEGMENT_SIZE] = '\0';
+
+        // Convert binary string to numerical value
+        unsigned long seg_val =
+            strtoul(temp_seg, NULL, 2);
+
+        sum += seg_val;
+
+        // Wrap around carry bits
+        while (sum >> 8) {
+            sum = (sum & 0xFF) + (sum >> 8);
+        }
+    }
+
+    return (unsigned char)(sum & 0xFF);
+}
+
+// Converts integer byte to 8-bit binary string
+void int_to_binary_str(unsigned char val, char *output) {
+    for (int i = 7; i >= 0; i--) {
+        output[7 - i] =
+            (val & (1 << i)) ? '1' : '0';
+    }
+
+    output[8] = '\0';
+}
+[24bcs052@mepcolinux leetcode]$cat l5.c
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+
+void calculate_the_maximum(int n, int k) {
+    int max_and = 0;
+    int max_or = 0;
+    int max_xor = 0;
+
+    // Nested loops to evaluate all unique pairs (i, j) where i < j
+    for (int i = 1; i <= n; i++) {
+        for (int j = i + 1; j <= n; j++) {
+
+            // Calculate bitwise operations
+            int current_and = i & j;
+            int current_or = i | j;
+            int current_xor = i ^ j;
+
+            // Maximum AND less than k
+            if (current_and < k && current_and > max_and) {
+                max_and = current_and;
+            }
+
+            // Maximum OR less than k
+            if (current_or < k && current_or > max_or) {
+                max_or = current_or;
+            }
+
+            // Maximum XOR less than k
+            if (current_xor < k && current_xor > max_xor) {
+                max_xor = current_xor;
+            }
+        }
+    }
+
+    // Print the final maximum values
+    printf("%d\n", max_and);
+    printf("%d\n", max_or);
+    printf("%d\n", max_xor);
+}
+
+int main() {
+    int n, k;
+
+    // Read n and k
+    if (scanf("%d %d", &n, &k) == 2) {
+        calculate_the_maximum(n, k);
+    }
+
+    return 0;
+}
+[24bcs052@mepcolinux leetcode]$exit
+exit
+
+Script done on Mon Aug 10 11:15:17 2026
+[24bcs052@mepcolinux ex2]$
+
