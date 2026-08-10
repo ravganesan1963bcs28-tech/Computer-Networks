@@ -1,28 +1,85 @@
-```c
+[24bcs052@mepcolinux ex2]$cat crc.c
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
-void perform_crc_division(const char *input, const char *generator, char *remainder) {
+/* Validates that a string contains only 0s and 1s */
+int is_binary_string(const char *str) {
+    int i;
+    for (i = 0; str[i] != '\0'; i++) {
+        if (str[i] != '0' && str[i] != '1') {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* Programmatically enforces the three rules of a 'good generator' */
+int check_good_generator(const char *gen) {
+    int len = strlen(gen);
+    int one_count = 0;
+    int i;
+
+    // Rule 1: Length must be more than 2 characters
+    if (len <= 2) {
+        printf("Error: Generator must be more than 2 characters long to be effective.\n");
+        return 0;
+    }
+
+    // Rule 2: x^0 coefficient must be 1 (the final character must be '1')
+    if (gen[len - 1] != '1') {
+        printf("Error: The x^0 coefficient must be 1 (generator must end with a '1').\n");
+        return 0;
+    }
+
+    // Rule 3: Must contain (x + 1) as a factor.
+    // In modulo-2 polynomial math, if (x + 1) is a factor, substituting x = 1
+    // must result in a remainder of 0. This means the generator must have an EVEN number of '1's.
+    for (i = 0; i < len; i++) {
+        if (gen[i] == '1') {
+            one_count++;
+        }
+    }
+    if (one_count % 2 != 0) {
+        printf("Error: Generator does not contain (x + 1) as a factor (must have an even number of '1' bits).\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+void perform_crc_division(const char *input, const char *generator, char *remainder, int show_steps) {
     int input_len = strlen(input);
     int gen_len = strlen(generator);
-
     char *temp = (char *)malloc((input_len + 1) * sizeof(char));
+    int i, j;
+
     strcpy(temp, input);
 
-    for (int i = 0; i <= input_len - gen_len; i++) {
+    if (show_steps) {
+        printf("\n--- Step-by-Step XOR Division ---\n");
+        printf("Initial Data: %s\n", temp);
+    }
+
+    for (i = 0; i <= input_len - gen_len; i++) {
         if (temp[i] == '1') {
-            for (int j = 0; j < gen_len; j++) {
-                temp[i + j] =
-                    (temp[i + j] == generator[j]) ? '0' : '1';
+            if (show_steps) {
+                printf("Aligning:     ");
+                for (j = 0; j < i; j++) printf(" ");
+                printf("%s\n", generator);
+            }
+
+            for (j = 0; j < gen_len; j++) {
+                temp[i + j] = (temp[i + j] == generator[j]) ? '0' : '1';
+            }
+
+            if (show_steps) {
+                printf("Current XOR:  %s\n", temp);
             }
         }
     }
 
-    strncpy(remainder,
-            temp + (input_len - gen_len + 1),
-            gen_len - 1);
-
+    strncpy(remainder, temp + (input_len - gen_len + 1), gen_len - 1);
     remainder[gen_len - 1] = '\0';
 
     free(temp);
@@ -34,112 +91,162 @@ int main() {
     char remainder[100];
     char transmitted_cw[600];
     char received_cw[600];
+    char receiver_remainder[100];
+    char extracted_data[500] = {0};
 
-    int num_errors, error_pos;
+    int num_errors = 0;
+    int error_pos;
+    int gen_len;
+    int cw_len;
+    int is_error = 0;
+    int i;
 
-    printf("=== CRC Error Detection Lab Simulation ===\n");
-
-    printf("Enter binary data bitstream (e.g., 1001): ");
+    /* Input Collection */
+    printf("Enter binary data: ");
     scanf("%499s", data);
+    if (!is_binary_string(data)) {
+        printf("Error: Input data must only contain 0 and 1.\n");
+        return 1;
+    }
 
-    printf("Enter generator polynomial bits (e.g., 1011): ");
+    printf("Enter generator bits: ");
     scanf("%99s", generator);
+    if (!is_binary_string(generator) || generator[0] != '1') {
+        printf("Error: Generator must be binary and start with 1.\n");
+        return 1;
+    }
 
-    int gen_len = strlen(generator);
+    /* Enforce Good Generator Conditions */
+    if (!check_good_generator(generator)) {
+        return 1;
+    }
+
+    gen_len = strlen(generator);
 
     // --- SENDER SIDE ---
     strcpy(augmented_data, data);
-
-    for (int i = 0; i < gen_len - 1; i++) {
+    for (i = 0; i < gen_len - 1; i++) {
         strcat(augmented_data, "0");
     }
 
-    perform_crc_division(augmented_data, generator, remainder);
+    perform_crc_division(augmented_data, generator, remainder, 1);
 
     strcpy(transmitted_cw, data);
     strcat(transmitted_cw, remainder);
 
     printf("\n--- Sender Side ---\n");
-    printf("Original Data:        %s\n", data);
-    printf("Generator Polynomial: %s\n", generator);
-    printf("Calculated Remainder: %s\n", remainder);
-    printf("Transmitted Codeword: %s\n", transmitted_cw);
+    printf("Original Data: %s\n", data);
+    printf("Generator:     %s\n", generator);
+    printf("Remainder:     %s\n", remainder);
+    printf("Sent Data:     %s\n", transmitted_cw);
 
-    // --- CHANNEL SIMULATION ---
+    // --- ERROR SIMULATION ---
     strcpy(received_cw, transmitted_cw);
+    cw_len = strlen(received_cw);
 
-    int cw_len = strlen(received_cw);
-
-    printf("\n--- Transmission Error Simulation ---\n");
-    printf("How many bits do you want to corrupt/flip? (Enter 0, 1, or more): ");
+    printf("\n--- Error Simulation ---\n");
+    printf("Enter number of bits to flip: ");
     scanf("%d", &num_errors);
 
     if (num_errors > 0) {
-        printf("Enter the 0-indexed positions (from 0 to %d) to flip: ",
-               cw_len - 1);
-
-        for (int i = 0; i < num_errors; i++) {
+        printf("Enter bit positions (0 to %d): ", cw_len - 1);
+        for (i = 0; i < num_errors; i++) {
             scanf("%d", &error_pos);
-
             if (error_pos >= 0 && error_pos < cw_len) {
-                received_cw[error_pos] =
-                    (received_cw[error_pos] == '0') ? '1' : '0';
+                received_cw[error_pos] = (received_cw[error_pos] == '0') ? '1' : '0';
             }
         }
-
-        printf("[Channel] Injected %d error bit(s) into the stream.\n",
-               num_errors);
+        printf("Result: Flipped %d bits successfully.\n", num_errors);
     } else {
-        printf("[Channel] Transmitting perfectly with no channel errors.\n");
+        printf("Result: No errors added.\n");
     }
 
     // --- RECEIVER SIDE ---
-    char receiver_remainder[100];
+    perform_crc_division(received_cw, generator, receiver_remainder, 0);
 
-    perform_crc_division(received_cw,
-                         generator,
-                         receiver_remainder);
-
-    int is_error = 0;
-
-    for (int i = 0; i < gen_len - 1; i++) {
+    for (i = 0; i < gen_len - 1; i++) {
         if (receiver_remainder[i] == '1') {
             is_error = 1;
             break;
         }
     }
 
-    // Extract original data portion
-    char extracted_data[500] = {0};
-
-    strncpy(extracted_data,
-            received_cw,
-            strlen(data));
-
+    strncpy(extracted_data, received_cw, strlen(data));
     extracted_data[strlen(data)] = '\0';
 
     printf("\n--- Receiver Side ---\n");
-    printf("Received Codeword:    %s\n", received_cw);
-    printf("Receiver Remainder:   %s\n", receiver_remainder);
+    printf("Received Data: %s\n", received_cw);
+    printf("Receiver Remainder: %s\n", receiver_remainder);
 
-    printf("\n========================================\n");
-    printf("FINAL ERROR DETECTION STATUS:\n");
-
+    printf("\n--- Final Status ---\n");
     if (is_error) {
-        printf(">>> STATUS: FAIL - Transmission is CORRUPTED!\n");
-        printf(">>> Reason: Receiver remainder is non-zero (%s).\n",
-               receiver_remainder);
-        printf(">>> Extracted Original Data:   %s (CORRUPTED)\n",
-               extracted_data);
+        printf("Result: FAIL - Error detected!\n");
+        printf("Output: %s (Corrupted)\n", extracted_data);
     } else {
-        printf(">>> STATUS: PASS - Transmission is SUCCESSFUL / ERROR FREE!\n");
-        printf(">>> Reason: Receiver remainder is perfectly zero.\n");
-        printf(">>> Extracted Original Data:   %s\n",
-               extracted_data);
+        printf("Result: PASS - No errors found.\n");
+        printf("Output: %s\n", extracted_data);
     }
-
-    printf("========================================\n");
 
     return 0;
 }
-```
+[24bcs052@mepcolinux ex2]$./a.out
+Enter binary data: 10100111
+Enter generator bits: 101
+
+--- Step-by-Step XOR Division ---
+Initial Data: 1010011100
+Aligning:     101
+Current XOR:  0000011100
+Aligning:          101
+Current XOR:  0000001000
+Aligning:           101
+Current XOR:  0000000010
+
+--- Sender Side ---
+Original Data: 10100111
+Generator:     101
+Remainder:     10
+Sent Data:     1010011110
+
+--- Error Simulation ---
+Enter number of bits to flip: 0
+Result: No errors added.
+
+--- Receiver Side ---
+Received Data: 1010011110
+Receiver Remainder: 00
+
+--- Final Status ---
+Result: PASS - No errors found.
+Output: 10100111
+[24bcs052@mepcolinux ex2]$./a.out
+Enter binary data: 1101
+Enter generator bits: 1111
+
+--- Step-by-Step XOR Division ---
+Initial Data: 1101000
+Aligning:     1111
+Current XOR:  0010000
+Aligning:       1111
+Current XOR:  0001110
+Aligning:        1111
+Current XOR:  0000001
+
+--- Sender Side ---
+Original Data: 1101
+Generator:     1111
+Remainder:     001
+Sent Data:     1101001
+
+--- Error Simulation ---
+Enter number of bits to flip: 1
+Enter bit positions (0 to 6): 2
+Result: Flipped 1 bits successfully.
+
+--- Receiver Side ---
+Received Data: 1111001
+Receiver Remainder: 001
+
+--- Final Status ---
+Result: FAIL - Error detected!
+Output: 1111 (Corrupted)
