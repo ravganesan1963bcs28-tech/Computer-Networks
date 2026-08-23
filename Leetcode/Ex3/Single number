@@ -1,0 +1,37 @@
+#include <stdio.h>
+
+int singleNumber(int nums[], int numsSize)
+{
+    int ans = 0;
+
+    for (int i = 0; i < numsSize; i++)
+    {
+        ans ^= nums[i];
+    }
+
+    return ans;
+}
+
+int main()
+{
+    int nums[100];
+    int n, i, result;
+
+    printf("========== SINGLE NUMBER ==========\n");
+
+    printf("\nEnter number of elements (e.g., 5): ");
+    scanf("%d", &n);
+
+    printf("Enter %d numbers (e.g., 2 2 1 2 2):\n", n);
+
+    for (i = 0; i < n; i++)
+    {
+        scanf("%d", &nums[i]);
+    }
+
+    result = singleNumber(nums, n);
+
+    printf("\nNumber that appears only once: %d\n", result);
+
+    return 0;
+}
