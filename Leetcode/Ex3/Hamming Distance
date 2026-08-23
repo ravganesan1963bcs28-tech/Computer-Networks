@@ -1,0 +1,45 @@
+#include <stdio.h>
+
+int totalHammingDistance(int nums[], int n)
+{
+    int total = 0;
+
+    for (int bit = 0; bit < 32; bit++)
+    {
+        int ones = 0;
+
+        for (int i = 0; i < n; i++)
+        {
+            ones += (nums[i] >> bit) & 1;
+        }
+
+        total += ones * (n - ones);
+    }
+
+    return total;
+}
+
+int main()
+{
+    int nums[100];
+    int n, i;
+    int result;
+
+    printf("========== TOTAL HAMMING DISTANCE ==========\n");
+
+    printf("\nEnter number of elements (e.g., 3): ");
+    scanf("%d", &n);
+
+    printf("Enter %d numbers (e.g., 4 14 2): ", n);
+
+    for (i = 0; i < n; i++)
+    {
+        scanf("%d", &nums[i]);
+    }
+
+    result = totalHammingDistance(nums, n);
+
+    printf("\nTotal Hamming Distance = %d\n", result);
+
+    return 0;
+}
