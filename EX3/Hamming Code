@@ -2,128 +2,219 @@
 #include <string.h>
 
 int main() {
-    char data[50];
-    int datalen, r, codelen, i, j, k, pos;
-    int codeword[50], received[50];
-    int choice, errorpos;
+    char data[50], correctedData[50];
+    int code[50], received[50];
+    int dataLen, r = 0, codeLen;
+    int i, j, pos, choice, errorPos;
 
-    printf("Enter data bits as a binary string: ");
+    printf("\n========== HAMMING CODE ==========\n");
+
+    /* INPUT */
+    printf("\nEnter data bits (e.g., 1011): ");
     scanf("%s", data);
 
-    datalen = strlen(data);
+    dataLen = strlen(data);
 
-    r = 0;
-    while ((1 << r) < datalen + r + 1) {
-        r = r + 1;
-    }
+    /* Find number of parity bits */
+    while ((1 << r) < dataLen + r + 1)
+        r++;
 
-    codelen = datalen + r;
+    codeLen = dataLen + r;
 
+    /* Place data bits and parity positions */
     j = 0;
-    for (i = 1; i <= codelen; i++) {
-        if ((i & (i - 1)) == 0) {
-            codeword[i] = -1;
-        } else {
-            codeword[i] = data[j] - '0';
-            j = j + 1;
-        }
+
+    for (i = 1; i <= codeLen; i++) {
+        if ((i & (i - 1)) == 0)
+            code[i] = -1;
+        else
+            code[i] = data[j++] - '0';
     }
 
+    /* Calculate parity bits */
     for (i = 0; i < r; i++) {
+
         pos = 1 << i;
         int count = 0;
-        for (j = pos; j <= codelen; j = j + 1) {
-            if (((j / pos) % 2) == 1) {
-                if (codeword[j] == 1) {
-                    count = count + 1;
-                }
-            }
+
+        for (j = pos; j <= codeLen; j++) {
+
+            if (((j / pos) % 2) == 1 && code[j] == 1)
+                count++;
         }
-        if (count % 2 == 0) {
-            codeword[pos] = 0;
-        } else {
-            codeword[pos] = 1;
+
+        code[pos] = count % 2;
+    }
+
+    /* SENDER */
+    printf("\n------------- SENDER -------------\n");
+
+    printf("Data bits        : %s\n", data);
+    printf("Number of parity : %d\n", r);
+
+    printf("\nHamming Code Format:\n");
+
+    int dataNumber = 1;
+
+    for (i = 1; i <= codeLen; i++) {
+
+        if ((i & (i - 1)) == 0)
+            printf("P%d ", i);
+        else {
+            printf("D%d ", dataNumber);
+            dataNumber++;
         }
     }
 
-    printf("\n--- Sender Side ---\n");
-    printf("Data bits: %s\n", data);
-    printf("Number of parity bits: %d\n", r);
-    printf("Transmitted codeword: ");
-    for (i = 1; i <= codelen; i++) {
-        printf("%d", codeword[i]);
-    }
     printf("\n");
 
-    for (i = 1; i <= codelen; i++) {
-        received[i] = codeword[i];
-    }
+    printf("Position         : ");
 
-    printf("\nDo you want to introduce an error during transmission? (1 for yes, 0 for no): ");
+    for (i = 1; i <= codeLen; i++)
+        printf("%2d ", i);
+
+    printf("\n");
+
+    printf("Codeword         : ");
+
+    for (i = 1; i <= codeLen; i++)
+        printf("%2d ", code[i]);
+
+    printf("\n");
+
+    /* Copy codeword */
+    for (i = 1; i <= codeLen; i++)
+        received[i] = code[i];
+
+    /* ERROR INPUT */
+    printf("\nDo you want to introduce an error? (1 = Yes, 0 = No): ");
     scanf("%d", &choice);
 
     if (choice == 1) {
-        printf("Enter bit position to flip (1 to %d): ", codelen);
-        scanf("%d", &errorpos);
-        if (received[errorpos] == 0) {
-            received[errorpos] = 1;
+
+        printf("Enter error position (e.g., 5): ");
+        scanf("%d", &errorPos);
+
+        if (errorPos >= 1 && errorPos <= codeLen) {
+
+            received[errorPos] = !received[errorPos];
+
+            printf("Error introduced at position %d.\n", errorPos);
+
         } else {
-            received[errorpos] = 0;
+
+            printf("Invalid position!\n");
+            return 0;
         }
     }
 
-    printf("\n--- Receiver Side ---\n");
-    printf("Received codeword: ");
-    for (i = 1; i <= codelen; i++) {
-        printf("%d", received[i]);
-    }
+    /* RECEIVER */
+    printf("\n------------ RECEIVER ------------\n");
+
+    printf("Received Codeword: ");
+
+    for (i = 1; i <= codeLen; i++)
+        printf("%d ", received[i]);
+
     printf("\n");
 
+    /* SYNDROME */
     int syndrome = 0;
+
+    printf("\nParity Checks:\n");
+
     for (i = 0; i < r; i++) {
+
         pos = 1 << i;
         int count = 0;
-        for (j = pos; j <= codelen; j = j + 1) {
-            if (((j / pos) % 2) == 1) {
-                if (received[j] == 1) {
-                    count = count + 1;
-                }
-            }
+
+        for (j = pos; j <= codeLen; j++) {
+
+            if (((j / pos) % 2) == 1 && received[j] == 1)
+                count++;
         }
-        if (count % 2 != 0) {
-            syndrome = syndrome + pos;
-        }
+
+        printf("P%d check = %d\n", pos, count % 2);
+
+        if (count % 2)
+            syndrome += pos;
     }
 
-    printf("Syndrome (error position): %d\n", syndrome);
+    printf("\nSyndrome = %d\n", syndrome);
 
+    /* ERROR DETECTION */
     if (syndrome == 0) {
-        printf("Result: No error detected\n");
+
+        printf("Status   : No error detected.\n");
+
     } else {
-        printf("Result: Error detected at position %d\n", syndrome);
-        if (received[syndrome] == 0) {
-            received[syndrome] = 1;
-        } else {
-            received[syndrome] = 0;
-        }
-        printf("Corrected codeword: ");
-        for (i = 1; i <= codelen; i++) {
-            printf("%d", received[i]);
-        }
+
+        printf("Status   : Error detected!\n");
+        printf("Error at : Position %d\n", syndrome);
+
+        /* Correct error */
+        received[syndrome] = !received[syndrome];
+
+        printf("Corrected Codeword: ");
+
+        for (i = 1; i <= codeLen; i++)
+            printf("%d ", received[i]);
+
         printf("\n");
     }
 
+    /* EXTRACT DATA */
     j = 0;
-    char correcteddata[50];
-    for (i = 1; i <= codelen; i++) {
-        if ((i & (i - 1)) != 0) {
-            correcteddata[j] = received[i] + '0';
-            j = j + 1;
-        }
-    }
-    correcteddata[j] = '\0';
 
-    printf("Extracted data bits: %s\n", correcteddata);
+    for (i = 1; i <= codeLen; i++) {
+
+        if ((i & (i - 1)) != 0)
+            correctedData[j++] = received[i] + '0';
+    }
+
+    correctedData[j] = '\0';
+
+    printf("\nRecovered Data: %s\n", correctedData);
+
+    printf("\n===================================\n");
 
     return 0;
 }
+
+========== HAMMING CODE ==========
+
+Enter data bits (e.g., 1011): 1011
+
+------------- SENDER -------------
+Data bits        : 1011
+Number of parity : 3
+
+Hamming Code Format:
+P1 P2 D1 P4 D2 D3 D4 
+Position         :  1  2  3  4  5  6  7 
+Codeword         :  0  1  1  0  0  1  1 
+
+Do you want to introduce an error? (1 = Yes, 0 = No): 1
+Enter error position (e.g., 5): 4
+Error introduced at position 4.
+
+------------ RECEIVER ------------
+Received Codeword: 0 1 1 1 0 1 1 
+
+Parity Checks:
+P1 check = 0
+P2 check = 0
+P4 check = 1
+
+Syndrome = 4
+Status   : Error detected!
+Error at : Position 4
+Corrected Codeword: 0 1 1 0 0 1 1 
+
+Recovered Data: 1011
+
+===================================
+
+
+=== Code Execution Successful ===
+
