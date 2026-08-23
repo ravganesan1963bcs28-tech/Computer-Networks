@@ -1,0 +1,39 @@
+#include <stdio.h>
+
+int maximizingXor(int l, int r)
+{
+    int max = 0;
+
+    for (int i = l; i <= r; i++)
+    {
+        for (int j = i; j <= r; j++)
+        {
+            int result = i ^ j;
+
+            if (result > max)
+                max = result;
+        }
+    }
+
+    return max;
+}
+
+int main()
+{
+    int l, r;
+    int result;
+
+    printf("========== MAXIMIZING XOR ==========\n");
+
+    printf("\nEnter lower value (e.g., 10): ");
+    scanf("%d", &l);
+
+    printf("Enter upper value (e.g., 15): ");
+    scanf("%d", &r);
+
+    result = maximizingXor(l, r);
+
+    printf("\nMaximum XOR value = %d\n", result);
+
+    return 0;
+}
