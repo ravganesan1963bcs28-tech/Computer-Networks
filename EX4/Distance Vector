@@ -1,433 +1,328 @@
+[24bcs052@mepcolinux ex4]$cat d3.c
 #include <stdio.h>
-
 #define MAX 10
 #define INF 999
 
-
-/* =================================================
-   FUNCTION 1: DISPLAY COST MATRIX
-   ================================================= */
-
-void displayMatrix(int n, int graph[MAX][MAX])
-{
+void displayMatrix(int n, int graph[MAX][MAX]) {
     int i, j;
-
-    printf("\n============================================\n");
-    printf("                COST MATRIX\n");
-    printf("============================================\n\n");
-
-    printf("\t");
-
-    for (i = 0; i < n; i++)
-        printf("R%d\t", i + 1);
-
+    printf("\n--- CURRENT BIDIRECTIONAL NETWORK MAP ---\n\t");
+    for (i = 0; i < n; i++) printf("R%d\t", i + 1);
     printf("\n");
-
-    for (i = 0; i < n; i++)
-    {
+    for (i = 0; i < n; i++) {
         printf("R%d\t", i + 1);
-
-        for (j = 0; j < n; j++)
-        {
-            if (graph[i][j] == INF)
-                printf("INF\t");
-            else
-                printf("%d\t", graph[i][j]);
+        for (j = 0; j < n; j++) {
+            if (graph[i][j] == INF) printf("INF\t");
+            else printf("%d\t", graph[i][j]);
         }
-
         printf("\n");
     }
 }
 
-
-/* =================================================
-   FUNCTION 2: DISTANCE VECTOR ROUTING
-   ================================================= */
-
-void distanceVector(int n, int cost[MAX][MAX])
-{
-    int distance[MAX][MAX];
-    int nextHop[MAX][MAX];
-
-    int i, j, k;
-    int updated;
-    int iteration = 0;
-
-    /* Initialize routing table */
-
-    for (i = 0; i < n; i++)
-    {
-        for (j = 0; j < n; j++)
-        {
+void distanceVector(int n, int cost[MAX][MAX]) {
+    int distance[MAX][MAX], nextHop[MAX][MAX];
+    int i, j, k, updated, iteration = 0;
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
             distance[i][j] = cost[i][j];
-
-            if (cost[i][j] != INF && i != j)
-                nextHop[i][j] = j;
-            else
-                nextHop[i][j] = -1;
+            if (cost[i][j] != INF && i != j) nextHop[i][j] = j;
+            else nextHop[i][j] = -1;
         }
     }
-
-
-    /* Distance Vector calculation */
-
-    do
-    {
+    do {
         updated = 0;
         iteration++;
-
-        for (i = 0; i < n; i++)
-        {
-            for (j = 0; j < n; j++)
-            {
-                for (k = 0; k < n; k++)
-                {
-                    if (distance[i][k] != INF &&
-                        distance[k][j] != INF)
-                    {
-                        if (distance[i][k] +
-                            distance[k][j] <
-                            distance[i][j])
-                        {
-                            distance[i][j] =
-                                distance[i][k] +
-                                distance[k][j];
-
-                            nextHop[i][j] =
-                                nextHop[i][k];
-
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                for (k = 0; k < n; k++) {
+                    if (distance[i][k] != INF && distance[k][j] != INF) {
+                        if (distance[i][k] + distance[k][j] < distance[i][j]) {
+                            distance[i][j] = distance[i][k] + distance[k][j];
+                            nextHop[i][j] = nextHop[i][k];
                             updated = 1;
                         }
                     }
                 }
             }
         }
-
     } while (updated);
-
-
-    /* Display result */
-
-    printf("\n============================================\n");
-    printf("          DISTANCE VECTOR ROUTING\n");
-    printf("============================================\n");
-
-    printf("\nNumber of iterations: %d\n", iteration);
-
-    for (i = 0; i < n; i++)
-    {
-        printf("\n------------ ROUTER R%d ------------\n", i + 1);
-
-        printf("Destination\tNext Hop\tDistance\n");
-        printf("--------------------------------------------\n");
-
-        for (j = 0; j < n; j++)
-        {
+    printf("\n*** RIP DISTANCE VECTOR RESULTS ***\nTotal convergence rounds taken: %d\n", iteration);
+    for (i = 0; i < n; i++) {
+        printf("\n[ RIP TABLE FOR ROUTER %d ]\nEnd Router\tNext Step\tTotal Cost\n-----------------------------------\n", i + 1);
+        for (j = 0; j < n; j++) {
             printf("R%d\t\t", j + 1);
-
-            if (i == j)
-            {
-                printf("-\t\t0\n");
-            }
-            else if (distance[i][j] == INF)
-            {
-                printf("-\t\tINF\n");
-            }
-            else
-            {
-                printf("R%d\t\t%d\n",
-                       nextHop[i][j] + 1,
-                       distance[i][j]);
-            }
+            if (i == j) printf("-\t\t0\n");
+            else if (distance[i][j] == INF) printf("-\t\tINF\n");
+            else printf("R%d\t\t%d\n", nextHop[i][j] + 1, distance[i][j]);
         }
     }
 }
 
-
-/* =================================================
-   FUNCTION 3: FIND MINIMUM DISTANCE
-   ================================================= */
-
-int findMinimum(int distance[MAX],
-                int visited[MAX],
-                int n)
-{
-    int min = INF;
-    int index = -1;
-
-    int i;
-
-    for (i = 0; i < n; i++)
-    {
-        if (!visited[i] &&
-            distance[i] < min)
-        {
+int findMinimum(int distance[MAX], int visited[MAX], int n) {
+    int min = INF, index = -1, i;
+    for (i = 0; i < n; i++) {
+        if (!visited[i] && distance[i] < min) {
             min = distance[i];
             index = i;
         }
     }
-
     return index;
 }
 
-
-/* =================================================
-   FUNCTION 4: DISPLAY PATH
-   ================================================= */
-
-void displayPath(int parent[MAX],
-                 int destination)
-{
-    if (parent[destination] == -1)
-    {
+void displayPath(int parent[MAX], int destination) {
+    if (parent[destination] == -1) {
         printf("R%d", destination + 1);
         return;
     }
-
     displayPath(parent, parent[destination]);
-
-    printf(" -> R%d", destination + 1);
+    printf(" > R%d", destination + 1);
 }
 
-
-/* =================================================
-   FUNCTION 5: LINK STATE ROUTING
-   USING DIJKSTRA'S ALGORITHM
-   ================================================= */
-
-void linkState(int n, int graph[MAX][MAX])
-{
-    int distance[MAX];
-    int visited[MAX];
-    int parent[MAX];
-
-    int source;
-    int i, count;
-    int current;
-
-    printf("\nEnter source router (e.g., 1): ");
+void linkState(int n, int graph[MAX][MAX]) {
+    int distance[MAX], visited[MAX], parent[MAX];
+    int source, i, count, current;
+    printf("\nEnter starting OSPF router (1-%d): ", n);
     scanf("%d", &source);
-
-    if (source < 1 || source > n)
-    {
-        printf("\nInvalid source router!\n");
+    if (source < 1 || source > n) {
+        printf("\nInvalid choice!\n");
         return;
     }
-
     source--;
-
-
-    /* Initialization */
-
-    for (i = 0; i < n; i++)
-    {
+    for (i = 0; i < n; i++) {
         distance[i] = INF;
         visited[i] = 0;
         parent[i] = -1;
     }
-
     distance[source] = 0;
-
-
-    /* Dijkstra Algorithm */
-
-    for (count = 0; count < n - 1; count++)
-    {
-        current =
-            findMinimum(distance,
-                        visited,
-                        n);
-
-        if (current == -1)
-            break;
-
+    for (count = 0; count < n - 1; count++) {
+        current = findMinimum(distance, visited, n);
+        if (current == -1) break;
         visited[current] = 1;
-
-        for (i = 0; i < n; i++)
-        {
-            if (!visited[i] &&
-                graph[current][i] != INF &&
-                distance[current] != INF)
-            {
-                int newDistance =
-                    distance[current] +
-                    graph[current][i];
-
-                if (newDistance < distance[i])
-                {
+        for (i = 0; i < n; i++) {
+            if (!visited[i] && graph[current][i] != INF && distance[current] != INF) {
+                int newDistance = distance[current] + graph[current][i];
+                if (newDistance < distance[i]) {
                     distance[i] = newDistance;
                     parent[i] = current;
                 }
             }
         }
     }
-
-
-    /* Display result */
-
-    printf("\n============================================\n");
-    printf("             LINK STATE ROUTING\n");
-    printf("============================================\n");
-
-    printf("\nSource Router: R%d\n", source + 1);
-
-    printf("\nDestination\tCost\tShortest Path\n");
-    printf("--------------------------------------------\n");
-
-    for (i = 0; i < n; i++)
-    {
+    printf("\n*** OSPF LINK STATE RESULTS ***\nOSPF Root Source: R%d\n\nEnd Router\tOSPF Cost\tFull SPF Route\n-----------------------------------\n", source + 1);
+    for (i = 0; i < n; i++) {
         printf("R%d\t\t", i + 1);
-
-        if (distance[i] == INF)
-        {
-            printf("INF\tNo Path\n");
-        }
-        else
-        {
-            printf("%d\t", distance[i]);
-
+        if (distance[i] == INF) printf("INF\tNo Route Found\n");
+        else {
+            printf("%d\t\t", distance[i]);
             displayPath(parent, i);
-
             printf("\n");
         }
     }
 }
 
-
-/* =================================================
-   MAIN FUNCTION
-   ================================================= */
-
-int main()
-{
-    int n;
-    int graph[MAX][MAX];
-
-    int i, j;
-    int choice;
-
-    printf("\n============================================\n");
-    printf("       ROUTING ALGORITHM SIMULATOR\n");
-    printf("============================================\n");
-
-    printf("\nSelect Routing Algorithm:\n");
-    printf("--------------------------------------------\n");
-    printf("1. Distance Vector Routing\n");
-    printf("2. Link State Routing\n");
-    printf("3. Run Both Algorithms\n");
-    printf("4. Exit\n");
-
-    printf("\nEnter your choice (e.g., 1): ");
-    scanf("%d", &choice);
-
-
-    /* Exit */
-
-    if (choice == 4)
-    {
-        printf("\nProgram terminated.\n");
-        return 0;
-    }
-
-
-    /* Validate choice */
-
-    if (choice < 1 || choice > 4)
-    {
-        printf("\nInvalid choice!\n");
-        return 0;
-    }
-
-
-    /* Number of routers */
-
-    printf("\nEnter number of routers (e.g., 4, maximum %d): ",
-           MAX);
-
-    scanf("%d", &n);
-
-    if (n <= 0 || n > MAX)
-    {
-        printf("\nInvalid number of routers!\n");
-        return 0;
-    }
-
-
-    /* Cost Matrix */
-
-    printf("\n============================================\n");
-    printf("              ENTER COST MATRIX\n");
-    printf("============================================\n");
-
-    printf("\nEnter the cost of each link.\n");
-    printf("Enter %d if there is NO direct connection.\n", INF);
-    printf("Cost from a router to itself will be 0.\n\n");
-
-
-    for (i = 0; i < n; i++)
-    {
-        for (j = 0; j < n; j++)
-        {
-            if (i == j)
-            {
-                graph[i][j] = 0;
+int main() {
+    int n = 0, graph[MAX][MAX];
+    int i, j, choice, modSrc, modDest, newCost, isConfigured = 0;
+    while (1) {
+        printf("\n=== CHOOSE AN ALGORITHM ===\n1. RIP (Distance Vector Protocol)\n2. OSPF (Link State Protocol)\n3. Run Both Protocols\n4. Modify Shared Link Cost\n5. Exit\n\nYour selection: ");
+        scanf("%d", &choice);
+        if (choice == 5) {
+            printf("\nGoodbye.\n");
+            break;
+        }
+        if (choice < 1 || choice > 5) {
+            printf("\nWrong option choice!\n");
+            continue;
+        }
+        if (!isConfigured && choice != 5) {
+            printf("\n[ NETWORK NOT CONFIGURED ]\nEnter total routers (max %d): ", MAX);
+            scanf("%d", &n);
+            if (n <= 0 || n > MAX) {
+                printf("\nInvalid number!\n");
+                n = 0;
                 continue;
             }
-
-            printf("Cost R%d -> R%d (e.g., 2 or %d): ",
-                   i + 1,
-                   j + 1,
-                   INF);
-
-            scanf("%d", &graph[i][j]);
+            for (i = 0; i < n; i++) {
+                for (j = 0; j < n; j++) {
+                    if (i == j) graph[i][j] = 0;
+                    else graph[i][j] = INF;
+                }
+            }
+            printf("\n--- ENTER SHARED TWO-WAY LINK COSTS ---\nType %d if there is no direct connection link.\n\n", INF);
+            for (i = 0; i < n; i++) {
+                for (j = i + 1; j < n; j++) {
+                    printf("Link Cost between R%d and R%d: ", i + 1, j + 1);
+                    scanf("%d", &newCost);
+                    graph[i][j] = newCost;
+                    graph[j][i] = newCost;
+                }
+            }
+            isConfigured = 1;
+            displayMatrix(n, graph);
+        }
+        switch (choice) {
+            case 1:
+                printf("\n>> Running RIP Protocol\n");
+                distanceVector(n, graph);
+                break;
+            case 2:
+                printf("\n>> Running OSPF Protocol\n");
+                linkState(n, graph);
+                break;
+            case 3:
+                printf("\n>> Running Both Protocols\n");
+                distanceVector(n, graph);
+                linkState(n, graph);
+                break;
+            case 4:
+                displayMatrix(n, graph);
+                printf("\n--- MODIFY SHARED LINK COST ---\nEnter first router (1-%d): ", n);
+                scanf("%d", &modSrc);
+                printf("Enter second router (1-%d): ", n);
+                scanf("%d", &modDest);
+                if (modSrc < 1 || modSrc > n || modDest < 1 || modDest > n) {
+                    printf("\nInvalid router options selected!\n");
+                    break;
+                }
+                if (modSrc == modDest) {
+                    printf("\nInternal loop metrics cannot change from 0!\n");
+                    break;
+                }
+                printf("Enter new symmetric cost (use %d for link down): ", INF);
+                scanf("%d", &newCost);
+                graph[modSrc - 1][modDest - 1] = newCost;
+                graph[modDest - 1][modSrc - 1] = newCost;
+                printf("\nShared link values updated dynamically!\n");
+                displayMatrix(n, graph);
+                break;
+            default:
+                break;
         }
     }
-
-
-    /* Display network */
-
-    displayMatrix(n, graph);
-
-
-    /* Select algorithm */
-
-    switch (choice)
-    {
-        case 1:
-
-            printf("\n\n******** RUNNING DISTANCE VECTOR ********\n");
-
-            distanceVector(n, graph);
-
-            break;
-
-
-        case 2:
-
-            printf("\n\n******** RUNNING LINK STATE ********\n");
-
-            linkState(n, graph);
-
-            break;
-
-
-        case 3:
-
-            printf("\n\n******** RUNNING DISTANCE VECTOR ********\n");
-
-            distanceVector(n, graph);
-
-            printf("\n\n******** RUNNING LINK STATE ********\n");
-
-            linkState(n, graph);
-
-            break;
-    }
-
-
-    printf("\n============================================\n");
-    printf("             PROGRAM COMPLETED\n");
-    printf("============================================\n");
-
+    printf("\n======\n FINISHED RUNNING\n=====\n");
     return 0;
 }
+
+[24bcs052@mepcolinux ex4]$./a.out
+
+=== CHOOSE AN ALGORITHM ===
+1. RIP (Distance Vector Protocol)
+2. OSPF (Link State Protocol)
+3. Run Both Protocols
+4. Modify Shared Link Cost
+5. Exit
+
+Your selection: 3
+
+[ NETWORK NOT CONFIGURED ]
+Enter total routers (max 10): 4
+
+--- ENTER SHARED TWO-WAY LINK COSTS ---
+Type 999 if there is no direct connection link.
+
+Link Cost between R1 and R2: 5
+Link Cost between R1 and R3: 6
+Link Cost between R1 and R4: 3
+Link Cost between R2 and R3: 7
+Link Cost between R2 and R4: 2
+Link Cost between R3 and R4: 8
+
+--- CURRENT BIDIRECTIONAL NETWORK MAP ---
+        R1      R2      R3      R4
+R1      0       5       6       3
+R2      5       0       7       2
+R3      6       7       0       8
+R4      3       2       8       0
+
+>> Running Both Protocols
+
+*** RIP DISTANCE VECTOR RESULTS ***
+Total convergence rounds taken: 1
+
+[ RIP TABLE FOR ROUTER 1 ]
+End Router      Next Step       Total Cost
+-----------------------------------
+R1              -               0
+R2              R2              5
+R3              R3              6
+R4              R4              3
+
+[ RIP TABLE FOR ROUTER 2 ]
+End Router      Next Step       Total Cost
+-----------------------------------
+R1              R1              5
+R2              -               0
+R3              R3              7
+R4              R4              2
+
+[ RIP TABLE FOR ROUTER 3 ]
+End Router      Next Step       Total Cost
+-----------------------------------
+R1              R1              6
+R2              R2              7
+R3              -               0
+R4              R4              8
+
+[ RIP TABLE FOR ROUTER 4 ]
+End Router      Next Step       Total Cost
+-----------------------------------
+R1              R1              3
+R2              R2              2
+R3              R3              8
+R4              -               0
+
+Enter starting OSPF router (1-4): 2
+
+*** OSPF LINK STATE RESULTS ***
+OSPF Root Source: R2
+
+End Router      OSPF Cost       Full SPF Route
+-----------------------------------
+R1              5               R2 > R1
+R2              0               R2
+R3              7               R2 > R3
+R4              2               R2 > R4
+
+=== CHOOSE AN ALGORITHM ===
+1. RIP (Distance Vector Protocol)
+2. OSPF (Link State Protocol)
+3. Run Both Protocols
+4. Modify Shared Link Cost
+5. Exit
+
+Your selection: 4
+
+--- CURRENT BIDIRECTIONAL NETWORK MAP ---
+        R1      R2      R3      R4
+R1      0       5       6       3
+R2      5       0       7       2
+R3      6       7       0       8
+R4      3       2       8       0
+
+--- MODIFY SHARED LINK COST ---
+Enter first router (1-4): 2
+Enter second router (1-4): 3
+Enter new symmetric cost (use 999 for link down): 52
+
+Shared link values updated dynamically!
+
+--- CURRENT BIDIRECTIONAL NETWORK MAP ---
+        R1      R2      R3      R4
+R1      0       5       6       3
+R2      5       0       52      2
+R3      6       52      0       8
+R4      3       2       8       0
+
+=== CHOOSE AN ALGORITHM ===
+1. RIP (Distance Vector Protocol)
+2. OSPF (Link State Protocol)
+3. Run Both Protocols
+4. Modify Shared Link Cost
+5. Exit
+
+Your selection: 5
+
+Goodbye.
+
+======
+ FINISHED RUNNING
+=====
