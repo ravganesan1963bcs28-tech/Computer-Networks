@@ -218,3 +218,39 @@ Recovered Data: 1011
 
 === Code Execution Successful ===
 
+
+
+========== HAMMING CODE ==========
+
+Enter data bits (e.g., 1011): 1011
+
+------------- SENDER -------------
+Data bits        : 1011
+Number of parity : 3
+
+Hamming Code Format:
+P1 P2 D1 P4 D2 D3 D4 
+Position         :  1  2  3  4  5  6  7 
+Codeword         :  0  1  1  0  0  1  1 
+
+Do you want to introduce an error? (1 = Yes, 0 = No): 0
+
+------------ RECEIVER ------------
+Received Codeword: 0 1 1 0 0 1 1 
+
+Parity Checks:
+P1 check = 0
+P2 check = 0
+P4 check = 0
+
+Syndrome = 0
+Status   : No error detected!
+Corrected Codeword: 0 1 1 0 0 1 1 
+
+Recovered Data: 1011
+
+===================================
+
+
+=== Code Execution Successful ===
+
