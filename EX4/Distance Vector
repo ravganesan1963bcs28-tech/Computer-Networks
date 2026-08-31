@@ -1,4 +1,3 @@
-[24bcs052@mepcolinux ex4]$cat d3.c
 #include <stdio.h>
 #define MAX 10
 #define INF 999
@@ -13,6 +12,24 @@ void displayMatrix(int n, int graph[MAX][MAX]) {
         for (j = 0; j < n; j++) {
             if (graph[i][j] == INF) printf("INF\t");
             else printf("%d\t", graph[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+/* Helper function to display final converged matrix */
+void displayFinalCostMatrix(int n, int distance[MAX][MAX]) {
+    int i, j;
+    printf("\n========================================\n");
+    printf("         FINAL CONVERGED COST MATRIX\n");
+    printf("========================================\n\t");
+    for (i = 0; i < n; i++) printf("%c\t", 'A' + i);
+    printf("\n");
+    for (i = 0; i < n; i++) {
+        printf("%c\t", 'A' + i);
+        for (j = 0; j < n; j++) {
+            if (distance[i][j] == INF) printf("INF\t");
+            else printf("%d\t", distance[i][j]);
         }
         printf("\n");
     }
@@ -36,7 +53,6 @@ void distanceVector(int n, int cost[MAX][MAX]) {
         for (i = 0; i < n; i++) {
             for (j = 0; j < n; j++) {
                 for (k = 0; k < n; k++) {
-                    // Safety check from ref code: ensure we aren't calculating paths through non-existent hops
                     if (distance[i][k] != INF && distance[k][j] != INF && nextHop[i][k] != -1) {
                         if (distance[i][k] + distance[k][j] < distance[i][j]) {
                             distance[i][j] = distance[i][k] + distance[k][j];
@@ -59,6 +75,7 @@ void distanceVector(int n, int cost[MAX][MAX]) {
             else printf("%c\t\t%d\n", 'A' + nextHop[i][j], distance[i][j]);
         }
     }
+    displayFinalCostMatrix(n, distance);
 }
 
 int findMinimum(int distance[MAX], int visited[MAX], int n) {
@@ -83,7 +100,8 @@ void displayPath(int parent[MAX], int destination) {
 
 void linkState(int n, int graph[MAX][MAX]) {
     int distance[MAX], visited[MAX], parent[MAX];
-    int source, i, count, current;
+    int finalMatrix[MAX][MAX];
+    int source, i, j, count, current;
     char srcChar;
 
     printf("\nEnter starting OSPF router (A-%c): ", 'A' + n - 1);
@@ -93,6 +111,14 @@ void linkState(int n, int graph[MAX][MAX]) {
     if (source < 0 || source >= n) {
         printf("\nInvalid choice!\n");
         return;
+    }
+
+    /* Pre-populate matrix tracking for display layout */
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            if (i == j) finalMatrix[i][j] = 0;
+            else finalMatrix[i][j] = INF;
+        }
     }
 
     for (i = 0; i < n; i++) {
@@ -125,6 +151,81 @@ void linkState(int n, int graph[MAX][MAX]) {
             displayPath(parent, i);
             printf("\n");
         }
+        finalMatrix[source][i] = distance[i];
+    }
+
+    /* Populate remaining matrix row metrics temporarily for full map view parity */
+    for (i = 0; i < n; i++) {
+        if (i == source) continue;
+        int tempDist[MAX], tempVis[MAX];
+        for (j = 0; j < n; j++) { tempDist[j] = INF; tempVis[j] = 0; }
+        tempDist[i] = 0;
+        for (count = 0; count < n - 1; count++) {
+            int curr = findMinimum(tempDist, tempVis, n);
+            if (curr == -1) break;
+            tempVis[curr] = 1;
+            for (j = 0; j < n; j++) {
+                if (!tempVis[j] && graph[curr][j] != INF && tempDist[curr] != INF) {
+                    int nextD = tempDist[curr] + graph[curr][j];
+                    if (nextD < tempDist[j]) tempDist[j] = nextD;
+                }
+            }
+        }
+        for (j = 0; j < n; j++) finalMatrix[i][j] = tempDist[j];
+    }
+    displayFinalCostMatrix(n, finalMatrix);
+}
+
+void findSpecificShortestPath(int n, int graph[MAX][MAX]) {
+    char srcChar, destChar;
+    int source, dest;
+    int distance[MAX], visited[MAX], parent[MAX];
+    int i, count, current;
+
+    printf("\nEnter starting router (A-%c): ", 'A' + n - 1);
+    scanf(" %c", &srcChar);
+    printf("Enter destination router (A-%c): ", 'A' + n - 1);
+    scanf(" %c", &destChar);
+
+    source = srcChar - 'A';
+    dest = destChar - 'A';
+
+    if (source < 0 || source >= n || dest < 0 || dest >= n) {
+        printf("\nInvalid router options chosen!\n");
+        return;
+    }
+
+    for (i = 0; i < n; i++) {
+        distance[i] = INF;
+        visited[i] = 0;
+        parent[i] = -1;
+    }
+    distance[source] = 0;
+
+    for (count = 0; count < n - 1; count++) {
+        current = findMinimum(distance, visited, n);
+        if (current == -1) break;
+        visited[current] = 1;
+
+        for (i = 0; i < n; i++) {
+            if (!visited[i] && graph[current][i] != INF && distance[current] != INF) {
+                int newDistance = distance[current] + graph[current][i];
+                if (newDistance < distance[i]) {
+                    distance[i] = newDistance;
+                    parent[i] = current;
+                }
+            }
+        }
+    }
+
+    printf("\n=== MINIMUM COST PATH ROUTE ===\n");
+    if (distance[dest] == INF) {
+        printf("No path exists between %c and %c.\n", srcChar, destChar);
+    } else {
+        printf("Minimum Total Path Cost: %d\n", distance[dest]);
+        printf("Shortest Structural Route: ");
+        displayPath(parent, dest);
+        printf("\n");
     }
 }
 
@@ -135,21 +236,28 @@ int main() {
     int modSrc, modDest;
 
     while (1) {
-        printf("\n=== CHOOSE AN ALGORITHM ===\n1. RIP (Distance Vector Protocol)\n2. OSPF (Link State Protocol)\n3. Run Both Protocols\n4. Modify Shared Link Cost\n5. Exit\n\nYour selection: ");
+        printf("\n=== CHOOSE AN ALGORITHM ===\n");
+        printf("1. RIP (Distance Vector Protocol)\n");
+        printf("2. OSPF (Link State Protocol)\n");
+        printf("3. Run Both Protocols\n");
+        printf("4. Modify Shared Link Cost\n");
+        printf("5. Find Minimum Cost Path for a Pair\n");
+        printf("6. Exit\n\nYour selection: ");
+
         if (scanf("%d", &choice) != 1) {
             while (getchar() != '\n');
             printf("\nWrong option choice!\n");
             continue;
         }
-        if (choice == 5) {
+        if (choice == 6) {
             printf("\nGoodbye.\n");
             break;
         }
-        if (choice < 1 || choice > 5) {
+        if (choice < 1 || choice > 6) {
             printf("\nWrong option choice!\n");
             continue;
         }
-        if (!isConfigured && choice != 5) {
+        if (!isConfigured && choice != 6) {
             printf("\n[ NETWORK NOT CONFIGURED ]\nEnter total routers (max %d): ", MAX);
             scanf("%d", &n);
             if (n <= 0 || n > MAX) {
@@ -169,7 +277,6 @@ int main() {
                     printf("Link Cost between %c and %c: ", 'A' + i, 'A' + j);
                     scanf("%d", &newCost);
 
-                    // SAFETY TRAP from ref code: Converts accidental 0 entries into INF
                     if (newCost == 0) {
                         newCost = INF;
                     }
@@ -225,6 +332,9 @@ int main() {
                 printf("\nShared link values updated dynamically!\n");
                 displayMatrix(n, graph);
                 break;
+            case 5:
+                findSpecificShortestPath(n, graph);
+                break;
             default:
                 break;
         }
@@ -232,13 +342,16 @@ int main() {
     printf("\n======\n FINISHED RUNNING\n=====\n");
     return 0;
 }
+
 [24bcs052@mepcolinux ex4]$./a.out
+
 === CHOOSE AN ALGORITHM ===
 1. RIP (Distance Vector Protocol)
 2. OSPF (Link State Protocol)
 3. Run Both Protocols
 4. Modify Shared Link Cost
-5. Exit
+5. Find Minimum Cost Path for a Pair
+6. Exit
 
 Your selection: 1
 
@@ -317,12 +430,23 @@ C               C               3
 D               C               4
 E               -               0
 
+========================================
+         FINAL CONVERGED COST MATRIX
+========================================
+        A       B       C       D       E
+A       0       4       3       2       6
+B       4       0       4       5       7
+C       3       4       0       1       3
+D       2       5       1       0       4
+E       6       7       3       4       0
+
 === CHOOSE AN ALGORITHM ===
 1. RIP (Distance Vector Protocol)
 2. OSPF (Link State Protocol)
 3. Run Both Protocols
 4. Modify Shared Link Cost
-5. Exit
+5. Find Minimum Cost Path for a Pair
+6. Exit
 
 Your selection: 2
 
@@ -341,12 +465,116 @@ C               3               A > D > C
 D               2               A > D
 E               6               A > D > C > E
 
+========================================
+         FINAL CONVERGED COST MATRIX
+========================================
+        A       B       C       D       E
+A       0       4       3       2       6
+B       4       0       4       5       7
+C       3       4       0       1       3
+D       2       5       1       0       4
+E       6       7       3       4       0
+
 === CHOOSE AN ALGORITHM ===
 1. RIP (Distance Vector Protocol)
 2. OSPF (Link State Protocol)
 3. Run Both Protocols
 4. Modify Shared Link Cost
-5. Exit
+5. Find Minimum Cost Path for a Pair
+6. Exit
+
+Your selection: 3
+
+>> Running Both Protocols
+
+*** RIP DISTANCE VECTOR RESULTS ***
+Total convergence rounds taken: 2
+
+[ RIP TABLE FOR ROUTER A ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               -               0
+B               B               4
+C               D               3
+D               D               2
+E               D               6
+
+[ RIP TABLE FOR ROUTER B ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               A               4
+B               -               0
+C               C               4
+D               C               5
+E               C               7
+
+[ RIP TABLE FOR ROUTER C ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               D               3
+B               B               4
+C               -               0
+D               D               1
+E               E               3
+
+[ RIP TABLE FOR ROUTER D ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               A               2
+B               C               5
+C               C               1
+D               -               0
+E               C               4
+
+[ RIP TABLE FOR ROUTER E ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               C               6
+B               C               7
+C               C               3
+D               C               4
+E               -               0
+
+========================================
+         FINAL CONVERGED COST MATRIX
+========================================
+        A       B       C       D       E
+A       0       4       3       2       6
+B       4       0       4       5       7
+C       3       4       0       1       3
+D       2       5       1       0       4
+E       6       7       3       4       0
+
+Enter starting OSPF router (A-E): B
+
+*** OSPF LINK STATE RESULTS ***
+OSPF Root Source: B
+
+End Router      OSPF Cost       Full SPF Route
+-----------------------------------
+A               4               B > A
+B               0               B
+C               4               B > C
+D               5               B > C > D
+E               7               B > C > E
+
+========================================
+         FINAL CONVERGED COST MATRIX
+========================================
+        A       B       C       D       E
+A       0       4       3       2       6
+B       4       0       4       5       7
+C       3       4       0       1       3
+D       2       5       1       0       4
+E       6       7       3       4       0
+
+=== CHOOSE AN ALGORITHM ===
+1. RIP (Distance Vector Protocol)
+2. OSPF (Link State Protocol)
+3. Run Both Protocols
+4. Modify Shared Link Cost
+5. Find Minimum Cost Path for a Pair
+6. Exit
 
 Your selection: 4
 
@@ -360,16 +588,16 @@ E       INF     INF     3       7       0
 
 --- MODIFY SHARED LINK COST ---
 Enter first router (A-E): A
-Enter second router (A-E): B
-Enter new symmetric cost (use 999 for link down): 5
+Enter second router (A-E): C
+Enter new symmetric cost (use 999 for link down): 61
 
 Shared link values updated dynamically!
 
 --- CURRENT BIDIRECTIONAL NETWORK MAP ---
         A       B       C       D       E
-A       0       5       INF     2       INF
-B       5       0       4       INF     INF
-C       INF     4       0       1       3
+A       0       4       61      2       INF
+B       4       0       4       INF     INF
+C       61      4       0       1       3
 D       2       INF     1       0       7
 E       INF     INF     3       7       0
 
@@ -378,9 +606,27 @@ E       INF     INF     3       7       0
 2. OSPF (Link State Protocol)
 3. Run Both Protocols
 4. Modify Shared Link Cost
-5. Exit
+5. Find Minimum Cost Path for a Pair
+6. Exit
 
 Your selection: 5
+
+Enter starting router (A-E): A
+Enter destination router (A-E): B
+
+=== MINIMUM COST PATH ROUTE ===
+Minimum Total Path Cost: 4
+Shortest Structural Route: A > B
+
+=== CHOOSE AN ALGORITHM ===
+1. RIP (Distance Vector Protocol)
+2. OSPF (Link State Protocol)
+3. Run Both Protocols
+4. Modify Shared Link Cost
+5. Find Minimum Cost Path for a Pair
+6. Exit
+
+Your selection: 6
 
 Goodbye.
 
