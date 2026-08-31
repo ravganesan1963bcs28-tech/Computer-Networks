@@ -203,6 +203,89 @@ int main() {
 }
 
 [24bcs052@mepcolinux ex4]$./a.out
+=== CHOOSE AN ALGORITHM ===
+1. RIP (Distance Vector Protocol)
+2. OSPF (Link State Protocol)
+3. Run Both Protocols
+4. Modify Shared Link Cost
+5. Exit
+
+Your selection: 1
+
+[ NETWORK NOT CONFIGURED ]
+Enter total routers (max 10): 5
+
+--- ENTER SHARED TWO-WAY LINK COSTS ---
+Type 999 if there is no direct connection link.
+
+Link Cost between A and B: 4
+Link Cost between A and C: 0
+Link Cost between A and D: 2
+Link Cost between A and E: 0
+Link Cost between B and C: 4
+Link Cost between B and D: 0
+Link Cost between B and E: 0
+Link Cost between C and D: 1
+Link Cost between C and E: 3
+Link Cost between D and E: 7
+
+--- CURRENT BIDIRECTIONAL NETWORK MAP ---
+        A       B       C       D       E
+A       0       4       INF     2       INF
+B       4       0       4       INF     INF
+C       INF     4       0       1       3
+D       2       INF     1       0       7
+E       INF     INF     3       7       0
+
+>> Running RIP Protocol
+
+*** RIP DISTANCE VECTOR RESULTS ***
+Total convergence rounds taken: 2
+
+[ RIP TABLE FOR ROUTER A ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               -               0
+B               B               4
+C               D               3
+D               D               2
+E               D               6
+
+[ RIP TABLE FOR ROUTER B ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               A               4
+B               -               0
+C               C               4
+D               C               5
+E               C               7
+
+[ RIP TABLE FOR ROUTER C ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               D               3
+B               B               4
+C               -               0
+D               D               1
+E               E               3
+
+[ RIP TABLE FOR ROUTER D ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               A               2
+B               C               5
+C               C               1
+D               -               0
+E               C               4
+
+[ RIP TABLE FOR ROUTER E ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               C               6
+B               C               7
+C               C               3
+D               C               4
+E               -               0
 
 === CHOOSE AN ALGORITHM ===
 1. RIP (Distance Vector Protocol)
@@ -211,76 +294,22 @@ int main() {
 4. Modify Shared Link Cost
 5. Exit
 
-Your selection: 3
+Your selection: 2
 
-[ NETWORK NOT CONFIGURED ]
-Enter total routers (max 10): 4
+>> Running OSPF Protocol
 
---- ENTER SHARED TWO-WAY LINK COSTS ---
-Type 999 if there is no direct connection link.
-
-Link Cost between R1 and R2: 5
-Link Cost between R1 and R3: 6
-Link Cost between R1 and R4: 3
-Link Cost between R2 and R3: 7
-Link Cost between R2 and R4: 2
-Link Cost between R3 and R4: 8
-
---- CURRENT BIDIRECTIONAL NETWORK MAP ---
-        R1      R2      R3      R4
-R1      0       5       6       3
-R2      5       0       7       2
-R3      6       7       0       8
-R4      3       2       8       0
-
->> Running Both Protocols
-
-*** RIP DISTANCE VECTOR RESULTS ***
-Total convergence rounds taken: 1
-
-[ RIP TABLE FOR ROUTER 1 ]
-End Router      Next Step       Total Cost
------------------------------------
-R1              -               0
-R2              R2              5
-R3              R3              6
-R4              R4              3
-
-[ RIP TABLE FOR ROUTER 2 ]
-End Router      Next Step       Total Cost
------------------------------------
-R1              R1              5
-R2              -               0
-R3              R3              7
-R4              R4              2
-
-[ RIP TABLE FOR ROUTER 3 ]
-End Router      Next Step       Total Cost
------------------------------------
-R1              R1              6
-R2              R2              7
-R3              -               0
-R4              R4              8
-
-[ RIP TABLE FOR ROUTER 4 ]
-End Router      Next Step       Total Cost
------------------------------------
-R1              R1              3
-R2              R2              2
-R3              R3              8
-R4              -               0
-
-Enter starting OSPF router (1-4): 2
+Enter starting OSPF router (A-E): A
 
 *** OSPF LINK STATE RESULTS ***
-OSPF Root Source: R2
+OSPF Root Source: A
 
 End Router      OSPF Cost       Full SPF Route
 -----------------------------------
-R1              5               R2 > R1
-R2              0               R2
-R3              7               R2 > R3
-R4              2               R2 > R4
+A               0               A
+B               4               A > B
+C               3               A > D > C
+D               2               A > D
+E               6               A > D > C > E
 
 === CHOOSE AN ALGORITHM ===
 1. RIP (Distance Vector Protocol)
@@ -292,25 +321,27 @@ R4              2               R2 > R4
 Your selection: 4
 
 --- CURRENT BIDIRECTIONAL NETWORK MAP ---
-        R1      R2      R3      R4
-R1      0       5       6       3
-R2      5       0       7       2
-R3      6       7       0       8
-R4      3       2       8       0
+        A       B       C       D       E
+A       0       4       INF     2       INF
+B       4       0       4       INF     INF
+C       INF     4       0       1       3
+D       2       INF     1       0       7
+E       INF     INF     3       7       0
 
 --- MODIFY SHARED LINK COST ---
-Enter first router (1-4): 2
-Enter second router (1-4): 3
-Enter new symmetric cost (use 999 for link down): 52
+Enter first router (A-E): A
+Enter second router (A-E): B
+Enter new symmetric cost (use 999 for link down): 5
 
 Shared link values updated dynamically!
 
 --- CURRENT BIDIRECTIONAL NETWORK MAP ---
-        R1      R2      R3      R4
-R1      0       5       6       3
-R2      5       0       52      2
-R3      6       52      0       8
-R4      3       2       8       0
+        A       B       C       D       E
+A       0       5       INF     2       INF
+B       5       0       4       INF     INF
+C       INF     4       0       1       3
+D       2       INF     1       0       7
+E       INF     INF     3       7       0
 
 === CHOOSE AN ALGORITHM ===
 1. RIP (Distance Vector Protocol)
