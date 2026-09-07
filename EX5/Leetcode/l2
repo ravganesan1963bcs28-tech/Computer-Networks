@@ -1,0 +1,185 @@
+#include <stdlib.h>
+#include <stdbool.h>
+
+typedef struct {
+    long long key;
+    int count;
+} HashEntry;
+
+typedef struct {
+    HashEntry* entries;
+    int capacity;
+} HashMap;
+
+HashMap* createMap(int capacity) {
+    HashMap* map = (HashMap*)malloc(sizeof(HashMap));
+    map->capacity = capacity * 2 + 5;
+    map->entries = (HashEntry*)calloc(map->capacity, sizeof(HashEntry));
+    return map;
+}
+
+int getHash(long long key, int capacity) {
+    int h = (int)(key % capacity);
+    if (h < 0) h += capacity;
+    return h;
+}
+
+void mapInsert(HashMap* map, long long key) {
+    int idx = getHash(key, map->capacity);
+    while (map->entries[idx].count > 0 && map->entries[idx].key != key) {
+        idx = (idx + 1) % map->capacity;
+    }
+    map->entries[idx].key = key;
+    map->entries[idx].count++;
+}
+
+int mapGet(HashMap* map, long long key) {
+    int idx = getHash(key, map->capacity);
+    while (map->entries[idx].count > 0 || map->entries[idx].key != 0) {
+        if (map->entries[idx].key == key) return map->entries[idx].count;
+        idx = (idx + 1) % map->capacity;
+    }
+    return 0;
+}
+
+void mapRemove(HashMap* map, long long key) {
+    int idx = getHash(key, map->capacity);
+    while (map->entries[idx].count > 0 || map->entries[idx].key != 0) {
+        if (map->entries[idx].key == key) {
+            if (map->entries[idx].count > 0) map->entries[idx].count--;
+            return;
+        }
+        idx = (idx + 1) % map->capacity;
+    }
+}
+
+void freeMap(HashMap* map) {
+    free(map->entries);
+    free(map);
+}
+
+typedef struct {
+    long long* data;
+    int size;
+    bool isMinHeap;
+} Heap;
+
+Heap* createHeap(int capacity, bool isMinHeap) {
+    Heap* h = (Heap*)malloc(sizeof(Heap));
+    h->data = (long long*)malloc((capacity + 1) * sizeof(long long));
+    h->size = 0;
+    h->isMinHeap = isMinHeap;
+    return h;
+}
+
+bool compareHeap(long long a, long long b, bool isMinHeap) {
+    return isMinHeap ? (a < b) : (a > b);
+}
+
+void push(Heap* h, long long val) {
+    h->size++;
+    int i = h->size;
+    while (i > 1 && compareHeap(val, h->data[i / 2], h->isMinHeap)) {
+        h->data[i] = h->data[i / 2];
+        i /= 2;
+    }
+    h->data[i] = val;
+}
+
+void pop(Heap* h) {
+    if (h->size == 0) return;
+    long long last = h->data[h->size--];
+    int i = 1, child;
+    while (i * 2 <= h->size) {
+        child = i * 2;
+        if (child + 1 <= h->size && compareHeap(h->data[child + 1], h->data[child], h->isMinHeap)) {
+            child++;
+        }
+        if (compareHeap(last, h->data[child], h->isMinHeap)) break;
+        h->data[i] = h->data[child];
+        i = child;
+    }
+    h->data[i] = last;
+}
+
+long long top(Heap* h) {
+    return h->data[1];
+}
+
+void prune(Heap* h, HashMap* map) {
+    while (h->size > 0 && mapGet(map, top(h)) > 0) {
+        mapRemove(map, top(h));
+        pop(h);
+    }
+}
+
+double* medianSlidingWindow(int* nums, int numsSize, int k, int* returnSize) {
+    *returnSize = numsSize - k + 1;
+    double* result = (double*)malloc((*returnSize) * sizeof(double));
+
+    Heap* small = createHeap(numsSize, false);
+    Heap* large = createHeap(numsSize, true);
+    HashMap* delayed = createMap(numsSize);
+
+    int small_size = 0;
+    int large_size = 0;
+
+    for (int i = 0; i < k; i++) {
+        push(small, nums[i]);
+        small_size++;
+    }
+    for (int i = 0; i < k / 2; i++) {
+        push(large, top(small));
+        pop(small);
+        small_size--;
+        large_size++;
+    }
+
+    result[0] = (k % 2 == 1) ? (double)top(small) : ((double)top(small) + top(large)) / 2.0;
+
+    for (int i = k; i < numsSize; i++) {
+        long long out_num = nums[i - k];
+        long long in_num = nums[i];
+        int balance = 0;
+
+        if (out_num <= top(small)) {
+            balance--;
+        } else {
+            balance++;
+        }
+        mapInsert(delayed, out_num);
+
+        if (small->size > 0 && in_num <= top(small)) {
+            push(small, in_num);
+            small_size++;
+            balance++;
+        } else {
+            push(large, in_num);
+            large_size++;
+            balance--;
+        }
+
+        if (balance < 0) {
+            push(small, top(large));
+            pop(large);
+            small_size++;
+            large_size--;
+        } else if (balance > 0) {
+            push(large, top(small));
+            pop(small);
+            small_size--;
+            large_size++;
+        }
+
+        prune(small, delayed);
+        prune(large, delayed);
+
+        result[i - k + 1] = (k % 2 == 1) ? (double)top(small) : ((double)top(small) + top(large)) / 2.0;
+    }
+
+    free(small->data); free(small);
+    free(large->data); free(large);
+    freeMap(delayed);
+
+    return result;
+}
