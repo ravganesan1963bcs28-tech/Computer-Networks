@@ -1,0 +1,934 @@
+Script started on Mon Sep  7 10:12:53 2026
+[24bcs052@mepcolinux ex4]$cat fdis.c
+#include <stdio.h>
+#define MAX 10
+#define INF 999
+
+void displayMatrix(int n, int graph[MAX][MAX]) {
+    int i, j;
+    printf("\n--- CURRENT BIDIRECTIONAL NETWORK MAP ---\n\t");
+    for (i = 0; i < n; i++) printf("%c\t", 'A' + i);
+    printf("\n");
+    for (i = 0; i < n; i++) {
+        printf("%c\t", 'A' + i);
+        for (j = 0; j < n; j++) {
+            if (graph[i][j] == INF) printf("INF\t");
+            else printf("%d\t", graph[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+/* Helper function to display final converged matrix */
+void displayFinalCostMatrix(int n, int distance[MAX][MAX]) {
+    int i, j;
+    printf("\n========================================\n");
+    printf("         FINAL CONVERGED COST MATRIX\n");
+    printf("========================================\n\t");
+    for (i = 0; i < n; i++) printf("%c\t", 'A' + i);
+    printf("\n");
+    for (i = 0; i < n; i++) {
+        printf("%c\t", 'A' + i);
+        for (j = 0; j < n; j++) {
+            if (distance[i][j] == INF) printf("INF\t");
+            else printf("%d\t", distance[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+void distanceVector(int n, int cost[MAX][MAX]) {
+    int distance[MAX][MAX], nextHop[MAX][MAX];
+    int i, j, k, updated, iteration = 0;
+
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            distance[i][j] = cost[i][j];
+            if (cost[i][j] != INF && i != j) nextHop[i][j] = j;
+            else nextHop[i][j] = -1;
+        }
+    }
+
+    do {
+        updated = 0;
+        iteration++;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                for (k = 0; k < n; k++) {
+                    if (distance[i][k] != INF && distance[k][j] != INF && nextHop[i][k] != -1) {
+                        if (distance[i][k] + distance[k][j] < distance[i][j]) {
+                            distance[i][j] = distance[i][k] + distance[k][j];
+                            nextHop[i][j] = nextHop[i][k];
+                            updated = 1;
+                        }
+                    }
+                }
+            }
+        }
+    } while (updated);
+
+    printf("\n*** RIP DISTANCE VECTOR RESULTS ***\nTotal convergence rounds taken: %d\n", iteration);
+    for (i = 0; i < n; i++) {
+        printf("\n[ RIP TABLE FOR ROUTER %c ]\nEnd Router\tNext Step\tTotal Cost\n-----------------------------------\n", 'A' + i);
+        for (j = 0; j < n; j++) {
+            printf("%c\t\t", 'A' + j);
+            if (i == j) printf("-\t\t0\n");
+            else if (distance[i][j] == INF) printf("-\t\tINF\n");
+            else printf("%c\t\t%d\n", 'A' + nextHop[i][j], distance[i][j]);
+        }
+    }
+    displayFinalCostMatrix(n, distance);
+}
+
+int findMinimum(int distance[MAX], int visited[MAX], int n) {
+    int min = INF, index = -1, i;
+    for (i = 0; i < n; i++) {
+        if (!visited[i] && distance[i] < min) {
+            min = distance[i];
+            index = i;
+        }
+    }
+    return index;
+}
+
+void displayPath(int parent[MAX], int destination) {
+    if (parent[destination] == -1) {
+        printf("%c", 'A' + destination);
+        return;
+    }
+    displayPath(parent, parent[destination]);
+    printf(" > %c", 'A' + destination);
+}
+
+void linkState(int n, int graph[MAX][MAX]) {
+    int distance[MAX], visited[MAX], parent[MAX];
+    int finalMatrix[MAX][MAX];
+    int source, i, j, count, current;
+    char srcChar;
+
+    printf("\nEnter starting OSPF router (A-%c): ", 'A' + n - 1);
+    scanf(" %c", &srcChar);
+    source = srcChar - 'A';
+
+    if (source < 0 || source >= n) {
+        printf("\nInvalid choice!\n");
+        return;
+    }
+
+    /* Pre-populate matrix tracking for display layout */
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            if (i == j) finalMatrix[i][j] = 0;
+            else finalMatrix[i][j] = INF;
+        }
+    }
+
+    for (i = 0; i < n; i++) {
+        distance[i] = INF;
+        visited[i] = 0;
+        parent[i] = -1;
+    }
+    distance[source] = 0;
+
+    for (count = 0; count < n - 1; count++) {
+        current = findMinimum(distance, visited, n);
+        if (current == -1) break;
+        visited[current] = 1;
+        for (i = 0; i < n; i++) {
+            if (!visited[i] && graph[current][i] != INF && distance[current] != INF) {
+                int newDistance = distance[current] + graph[current][i];
+                if (newDistance < distance[i]) {
+                    distance[i] = newDistance;
+                    parent[i] = current;
+                }
+            }
+        }
+    }
+    printf("\n*** OSPF LINK STATE RESULTS ***\nOSPF Root Source: %c\n\nEnd Router\tOSPF Cost\tFull SPF Route\n-----------------------------------\n", 'A' + source);
+    for (i = 0; i < n; i++) {
+        printf("%c\t\t", 'A' + i);
+        if (distance[i] == INF) printf("INF\tNo Route Found\n");
+        else {
+            printf("%d\t\t", distance[i]);
+            displayPath(parent, i);
+            printf("\n");
+        }
+        finalMatrix[source][i] = distance[i];
+    }
+
+    /* Populate remaining matrix row metrics temporarily for full map view parity */
+    for (i = 0; i < n; i++) {
+        if (i == source) continue;
+        int tempDist[MAX], tempVis[MAX];
+        for (j = 0; j < n; j++) { tempDist[j] = INF; tempVis[j] = 0; }
+        tempDist[i] = 0;
+        for (count = 0; count < n - 1; count++) {
+            int curr = findMinimum(tempDist, tempVis, n);
+            if (curr == -1) break;
+            tempVis[curr] = 1;
+            for (j = 0; j < n; j++) {
+                if (!tempVis[j] && graph[curr][j] != INF && tempDist[curr] != INF) {
+                    int nextD = tempDist[curr] + graph[curr][j];
+                    if (nextD < tempDist[j]) tempDist[j] = nextD;
+                }
+            }
+        }
+        for (j = 0; j < n; j++) finalMatrix[i][j] = tempDist[j];
+    }
+    displayFinalCostMatrix(n, finalMatrix);
+}
+
+void findSpecificShortestPath(int n, int graph[MAX][MAX]) {
+    char srcChar, destChar;
+    int source, dest;
+    int distance[MAX], visited[MAX], parent[MAX];
+    int i, count, current;
+
+    printf("\nEnter starting router (A-%c): ", 'A' + n - 1);
+    scanf(" %c", &srcChar);
+    printf("Enter destination router (A-%c): ", 'A' + n - 1);
+    scanf(" %c", &destChar);
+
+    source = srcChar - 'A';
+    dest = destChar - 'A';
+
+    if (source < 0 || source >= n || dest < 0 || dest >= n) {
+        printf("\nInvalid router options chosen!\n");
+        return;
+    }
+
+    for (i = 0; i < n; i++) {
+        distance[i] = INF;
+        visited[i] = 0;
+        parent[i] = -1;
+    }
+    distance[source] = 0;
+
+    for (count = 0; count < n - 1; count++) {
+        current = findMinimum(distance, visited, n);
+        if (current == -1) break;
+        visited[current] = 1;
+
+        for (i = 0; i < n; i++) {
+            if (!visited[i] && graph[current][i] != INF && distance[current] != INF) {
+                int newDistance = distance[current] + graph[current][i];
+                if (newDistance < distance[i]) {
+                    distance[i] = newDistance;
+                    parent[i] = current;
+                }
+            }
+        }
+    }
+
+    printf("\n=== MINIMUM COST PATH ROUTE ===\n");
+    if (distance[dest] == INF) {
+        printf("No path exists between %c and %c.\n", srcChar, destChar);
+    } else {
+        printf("Minimum Total Path Cost: %d\n", distance[dest]);
+        printf("Shortest Structural Route: ");
+        displayPath(parent, dest);
+        printf("\n");
+    }
+}
+
+int main() {
+    int n = 0, graph[MAX][MAX];
+    int i, j, choice, newCost, isConfigured = 0;
+    char modSrcChar, modDestChar;
+    int modSrc, modDest;
+
+    while (1) {
+        printf("\n=== CHOOSE AN ALGORITHM ===\n");
+        printf("1. RIP (Distance Vector Protocol)\n");
+        printf("2. OSPF (Link State Protocol)\n");
+        printf("3. Run Both Protocols\n");
+        printf("4. Modify Shared Link Cost\n");
+        printf("5. Find Minimum Cost Path for a Pair\n");
+        printf("6. Exit\n\nYour selection: ");
+
+        if (scanf("%d", &choice) != 1) {
+            while (getchar() != '\n');
+            printf("\nWrong option choice!\n");
+            continue;
+        }
+        if (choice == 6) {
+            printf("\nGoodbye.\n");
+            break;
+        }
+        if (choice < 1 || choice > 6) {
+            printf("\nWrong option choice!\n");
+            continue;
+        }
+        if (!isConfigured && choice != 6) {
+            printf("\n[ NETWORK NOT CONFIGURED ]\nEnter total routers (max %d): ", MAX);
+            scanf("%d", &n);
+            if (n <= 0 || n > MAX) {
+                printf("\nInvalid number!\n");
+                n = 0;
+                continue;
+            }
+            for (i = 0; i < n; i++) {
+                for (j = 0; j < n; j++) {
+                    if (i == j) graph[i][j] = 0;
+                    else graph[i][j] = INF;
+                }
+            }
+            printf("\n--- ENTER SHARED TWO-WAY LINK COSTS ---\nType %d if there is no direct connection link.\n\n", INF);
+            for (i = 0; i < n; i++) {
+                for (j = i + 1; j < n; j++) {
+                    printf("Link Cost between %c and %c: ", 'A' + i, 'A' + j);
+                    scanf("%d", &newCost);
+
+                    if (newCost == 0) {
+                        newCost = INF;
+                    }
+
+                    graph[i][j] = newCost;
+                    graph[j][i] = newCost;
+                }
+            }
+            isConfigured = 1;
+            displayMatrix(n, graph);
+        }
+        switch (choice) {
+            case 1:
+                printf("\n>> Running RIP Protocol\n");
+                distanceVector(n, graph);
+                break;
+            case 2:
+                printf("\n>> Running OSPF Protocol\n");
+                linkState(n, graph);
+                break;
+            case 3:
+                printf("\n>> Running Both Protocols\n");
+                distanceVector(n, graph);
+                linkState(n, graph);
+                break;
+            case 4:
+                displayMatrix(n, graph);
+                printf("\n--- MODIFY SHARED LINK COST ---\nEnter first router (A-%c): ", 'A' + n - 1);
+                scanf(" %c", &modSrcChar);
+                printf("Enter second router (A-%c): ", 'A' + n - 1);
+                scanf(" %c", &modDestChar);
+
+                modSrc = modSrcChar - 'A' + 1;
+                modDest = modDestChar - 'A' + 1;
+
+                if (modSrc < 1 || modSrc > n || modDest < 1 || modDest > n) {
+                    printf("\nInvalid router options selected!\n");
+                    break;
+                }
+                if (modSrc == modDest) {
+                    printf("\nInternal loop metrics cannot change from 0!\n");
+                    break;
+                }
+                printf("Enter new symmetric cost (use %d for link down): ", INF);
+                scanf("%d", &newCost);
+
+                if (newCost == 0) {
+                    newCost = INF;
+                }
+
+                graph[modSrc - 1][modDest - 1] = newCost;
+                graph[modDest - 1][modSrc - 1] = newCost;
+                printf("\nShared link values updated dynamically!\n");
+                displayMatrix(n, graph);
+                break;
+            case 5:
+                findSpecificShortestPath(n, graph);
+                break;
+            default:
+                break;
+        }
+    }
+    printf("\n======\n FINISHED RUNNING\n=====\n");
+    return 0;
+}
+
+[24bcs052@mepcolinux ex4]$./a.out
+=== CHOOSE AN ALGORITHM ===
+1. RIP (Distance Vector Protocol)
+2. OSPF (Link State Protocol)
+3. Run Both Protocols
+4. Modify Shared Link Cost
+5. Find Minimum Cost Path for a Pair
+6. Exit
+
+Your selection: 1
+
+[ NETWORK NOT CONFIGURED ]
+Enter total routers (max 10): 5
+
+--- ENTER SHARED TWO-WAY LINK COSTS ---
+Type 999 if there is no direct connection link.
+
+Link Cost between A and B: 4
+Link Cost between A and C: 999
+Link Cost between A and D: 2
+Link Cost between A and E: 999
+Link Cost between B and C: 4
+Link Cost between B and D: 1
+Link Cost between B and E: 999
+Link Cost between C and D: 1
+Link Cost between C and E: 3
+Link Cost between D and E: 7
+
+--- CURRENT BIDIRECTIONAL NETWORK MAP ---
+        A       B       C       D       E
+A       0       4       INF     2       INF
+B       4       0       4       1       INF
+C       INF     4       0       1       3
+D       2       1       1       0       7
+E       INF     INF     3       7       0
+
+>> Running RIP Protocol
+
+*** RIP DISTANCE VECTOR RESULTS ***
+Total convergence rounds taken: 2
+
+[ RIP TABLE FOR ROUTER A ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               -               0
+B               D               3
+C               D               3
+D               D               2
+E               D               6
+
+[ RIP TABLE FOR ROUTER B ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               D               3
+B               -               0
+C               D               2
+D               D               1
+E               D               5
+
+[ RIP TABLE FOR ROUTER C ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               D               3
+B               D               2
+C               -               0
+D               D               1
+E               E               3
+
+[ RIP TABLE FOR ROUTER D ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               A               2
+B               B               1
+C               C               1
+D               -               0
+E               C               4
+
+[ RIP TABLE FOR ROUTER E ]
+End Router      Next Step       Total Cost
+-----------------------------------
+A               C               6
+B               C               5
+C               C               3
+D               C               4
+E               -               0
+
+========================================
+         FINAL CONVERGED COST MATRIX
+========================================
+        A       B       C       D       E
+A       0       3       3       2       6
+B       3       0       2       1       5
+C       3       2       0       1       3
+D       2       1       1       0       4
+E       6       5       3       4       0
+
+=== CHOOSE AN ALGORITHM ===
+1. RIP (Distance Vector Protocol)
+2. OSPF (Link State Protocol)
+3. Run Both Protocols
+4. Modify Shared Link Cost
+5. Find Minimum Cost Path for a Pair
+6. Exit
+
+Your selection: 2
+
+>> Running OSPF Protocol
+
+Enter starting OSPF router (A-E): A
+
+*** OSPF LINK STATE RESULTS ***
+OSPF Root Source: A
+
+End Router      OSPF Cost       Full SPF Route
+-----------------------------------
+A               0               A
+B               3               A > D > B
+C               3               A > D > C
+D               2               A > D
+E               6               A > D > C > E
+
+========================================
+         FINAL CONVERGED COST MATRIX
+========================================
+        A       B       C       D       E
+A       0       3       3       2       6
+B       3       0       2       1       5
+C       3       2       0       1       3
+D       2       1       1       0       4
+E       6       5       3       4       0
+
+=== CHOOSE AN ALGORITHM ===
+1. RIP (Distance Vector Protocol)
+2. OSPF (Link State Protocol)
+3. Run Both Protocols
+4. Modify Shared Link Cost
+5. Find Minimum Cost Path for a Pair
+6. Exit
+
+Your selection: 4
+
+--- CURRENT BIDIRECTIONAL NETWORK MAP ---
+        A       B       C       D       E
+A       0       4       INF     2       INF
+B       4       0       4       1       INF
+C       INF     4       0       1       3
+D       2       1       1       0       7
+E       INF     INF     3       7       0
+
+--- MODIFY SHARED LINK COST ---
+Enter first router (A-E): A
+Enter second router (A-E): C
+Enter new symmetric cost (use 999 for link down): 65
+
+Shared link values updated dynamically!
+
+--- CURRENT BIDIRECTIONAL NETWORK MAP ---
+        A       B       C       D       E
+A       0       4       65      2       INF
+B       4       0       4       1       INF
+C       65      4       0       1       3
+D       2       1       1       0       7
+E       INF     INF     3       7       0
+
+=== CHOOSE AN ALGORITHM ===
+1. RIP (Distance Vector Protocol)
+2. OSPF (Link State Protocol)
+3. Run Both Protocols
+4. Modify Shared Link Cost
+5. Find Minimum Cost Path for a Pair
+6. Exit
+
+Your selection: 5
+
+Enter starting router (A-E): A
+Enter destination router (A-E): D
+
+=== MINIMUM COST PATH ROUTE ===
+Minimum Total Path Cost: 2
+Shortest Structural Route: A > D
+
+=== CHOOSE AN ALGORITHM ===
+1. RIP (Distance Vector Protocol)
+2. OSPF (Link State Protocol)
+3. Run Both Protocols
+4. Modify Shared Link Cost
+5. Find Minimum Cost Path for a Pair
+6. Exit
+
+Your selection: 6
+
+Goodbye.
+
+======
+ FINISHED RUNNING
+=====
+[24bcs052@mepcolinux ex4]$cat l1.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+
+#define MAX_STOP 1000000
+
+// Structure to hold a dynamic list of buses for each stop
+typedef struct {
+    int *buses;
+    int size;
+    int capacity;
+} StopToBuses;
+
+int numBusesToDestination(int** routes, int routesSize, int* routesColSize, int source, int target) {
+    // Edge case: already at destination
+    if (source == target) return 0;
+
+    // Find the maximum stop index present in the routes to allocate exact memory
+    int max_stop_val = 0;
+    for (int i = 0; i < routesSize; i++) {
+        for (int j = 0; j < routesColSize[i]; j++) {
+            if (routes[i][j] > max_stop_val) {
+                max_stop_val = routes[i][j];
+            }
+        }
+    }
+
+    // If source or target is out of bounds of the actual stops available
+    if (source > max_stop_val || target > max_stop_val) return -1;
+
+    // Create the inverted index: Stop -> List of Bus Routes
+    StopToBuses* stopGraph = (StopToBuses*)calloc(max_stop_val + 1, sizeof(StopToBuses));
+    for (int i = 0; i < routesSize; i++) {
+        for (int j = 0; j < routesColSize[i]; j++) {
+            int stop = routes[i][j];
+            if (stopGraph[stop].size == stopGraph[stop].capacity) {
+                stopGraph[stop].capacity = stopGraph[stop].capacity == 0 ? 4 : stopGraph[stop].capacity * 2;
+                stopGraph[stop].buses = (int*)realloc(stopGraph[stop].buses, stopGraph[stop].capacity * sizeof(int));
+            }
+            stopGraph[stop].buses[stopGraph[stop].size++] = i;
+        }
+    }
+
+    // BFS setup
+    int* queue = (int*)malloc(routesSize * sizeof(int));
+    bool* visitedBuses = (bool*)calloc(routesSize, sizeof(bool));
+    bool* visitedStops = (bool*)calloc(max_stop_val + 1, sizeof(bool));
+
+    int head = 0, tail = 0;
+    int busCount = 0;
+
+    // Initialize BFS with all buses that pass through the source stop
+    visitedStops[source] = true;
+    for (int i = 0; i < stopGraph[source].size; i++) {
+        int bus = stopGraph[source].buses[i];
+        queue[tail++] = bus;
+        visitedBuses[bus] = true;
+    }
+
+    // Process BFS layer by layer
+    while (head < tail) {
+        int levelSize = tail - head;
+        busCount++; // Increment bus count for this connection layer
+
+        for (int i = 0; i < levelSize; i++) {
+            int currentBus = queue[head++];
+
+            // Check all stops this bus can reach
+            for (int j = 0; j < routesColSize[currentBus]; j++) {
+                int stop = routes[currentBus][j];
+
+                if (stop == target) {
+                    // Free allocated memory before returning
+                    for (int k = 0; k <= max_stop_val; k++) {
+                        if (stopGraph[k].buses) free(stopGraph[k].buses);
+                    }
+                    free(stopGraph);
+                    free(queue);
+                    free(visitedBuses);
+                    free(visitedStops);
+                    return busCount;
+                }
+
+                if (visitedStops[stop]) continue;
+                visitedStops[stop] = true;
+
+                // Enqueue all unvisited buses that pass through this stop
+                for (int k = 0; k < stopGraph[stop].size; k++) {
+                    int nextBus = stopGraph[stop].buses[k];
+                    if (!visitedBuses[nextBus]) {
+                        visitedBuses[nextBus] = true;
+                        queue[tail++] = nextBus;
+                    }
+                }
+            }
+        }
+    }
+
+    // Free memory if target is unreachable
+    for (int k = 0; k <= max_stop_val; k++) {
+        if (stopGraph[k].buses) free(stopGraph[k].buses);
+    }
+    free(stopGraph);
+    free(queue);
+    free(visitedBuses);
+    free(visitedStops);
+
+    return -1;
+}
+[24bcs052@mepcolinux ex4]$cat l2.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+
+#define INF 0x3F3F3F3F
+
+int findCheapestPrice(int n, int** flights, int flightsSize, int* flightsColSize, int src, int dst, int k) {
+    int dist[n];
+    int temp[n];
+
+    memset(dist, 0x3F, sizeof(dist));
+    dist[src] = 0;
+
+    for (int i = 0; i <= k; i++) {
+        memcpy(temp, dist, sizeof(dist));
+        for (int j = 0; j < flightsSize; j++) {
+            int u = flights[j][0];
+            int v = flights[j][1];
+            int p = flights[j][2];
+
+            if (dist[u] != INF && dist[u] + p < temp[v]) {
+                temp[v] = dist[u] + p;
+            }
+        }
+        memcpy(dist, temp, sizeof(temp));
+    }
+
+    return dist[dst] == INF ? -1 : dist[dst];
+}
+[24bcs052@mepcolinux ex4]$cat l3.c
+#include <limits.h>
+#include <stdbool.h>
+#include <stdlib.h>
+
+int networkDelayTime(int** times, int timesSize, int* timesColSize, int n, int k) {
+    // Allocate adjacency matrix (using 1-based indexing for nodes)
+    int** g = (int**)malloc((n + 1) * sizeof(int*));
+    int* dist = (int*)malloc((n + 1) * sizeof(int));
+    bool* vis = (bool*)malloc((n + 1) * sizeof(bool));
+
+    int inf = 1 << 29;
+
+    for (int i = 0; i <= n; i++) {
+        g[i] = (int*)malloc((n + 1) * sizeof(int));
+        for (int j = 0; j <= n; j++) {
+            g[i][j] = inf;
+        }
+        dist[i] = inf;
+        vis[i] = false;
+    }
+
+    // Build the graph
+    for (int i = 0; i < timesSize; i++) {
+        int u = times[i][0];
+        int v = times[i][1];
+        int w = times[i][2];
+        g[u][v] = w;
+    }
+
+    dist[k] = 0;
+
+    for (int i = 0; i < n; i++) {
+        int u = -1;
+        // Find the unvisited node with the smallest distance
+        for (int j = 1; j <= n; j++) {
+            if (!vis[j] && (u == -1 || dist[j] < dist[u])) {
+                u = j;
+            }
+        }
+
+        if (u == -1 || dist[u] == inf) {
+            break;
+        }
+
+        vis[u] = true;
+
+        // Update distances to neighbors
+        for (int v = 1; v <= n; v++) {
+            if (g[u][v] != inf && dist[u] + g[u][v] < dist[v]) {
+                dist[v] = dist[u] + g[u][v];
+            }
+        }
+    }
+
+    int max_dist = 0;
+    for (int i = 1; i <= n; i++) {
+        if (dist[i] == inf) {
+            // Free allocated memory
+            for (int j = 0; j <= n; j++) free(g[j]);
+            free(g); free(dist); free(vis);
+            return -1;
+        }
+        if (dist[i] > max_dist) {
+            max_dist = dist[i];
+        }
+    }
+
+    // Free allocated memory
+    for (int j = 0; j <= n; j++) free(g[j]);
+    free(g); free(dist); free(vis);
+
+    return max_dist;
+}
+[24bcs052@mepcolinux ex4]$cat l4.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <math.h>
+
+// Structure for Queue elements in BFS
+typedef struct {
+    int r;
+    int c;
+} Point;
+
+// Helper function to check if a path exists with a maximum allowed 'effort'
+bool canReachDestination(int** heights, int rows, int cols, int maxEffort) {
+    // Directions for moving Up, Down, Left, Right
+    int dr[] = {-1, 1, 0, 0};
+    int dc[] = {0, 0, -1, 1};
+
+    // Visited array tracker
+    bool** visited = (bool**)malloc(rows * sizeof(bool*));
+    for (int i = 0; i < rows; i++) {
+        visited[i] = (bool*)calloc(cols, sizeof(bool));
+    }
+
+    // Queue initialization
+    Point* queue = (Point*)malloc(rows * cols * sizeof(Point));
+    int head = 0, tail = 0;
+
+    // Start from the top-left cell
+    queue[tail++] = (Point){0, 0};
+    visited[0][0] = true;
+
+    bool reached = false;
+
+    while (head < tail) {
+        Point curr = queue[head++];
+
+        // If we reached the bottom-right cell
+        if (curr.r == rows - 1 && curr.c == cols - 1) {
+            reached = true;
+            break;
+        }
+
+        // Explore 4-directional neighbors
+        for (int i = 0; i < 4; i++) {
+            int nr = curr.r + dr[i];
+            int nc = curr.c + dc[i];
+
+            // Check boundary conditions and if already visited
+            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !visited[nr][nc]) {
+                // Check if the edge effort is within the current allowed maxEffort
+                int currentEffort = abs(heights[curr.r][curr.c] - heights[nr][nc]);
+                if (currentEffort <= maxEffort) {
+                    visited[nr][nc] = true;
+                    queue[tail++] = (Point){nr, nc};
+                }
+            }
+        }
+    }
+
+    // Free allocated memory
+    for (int i = 0; i < rows; i++) {
+        free(visited[i]);
+    }
+    free(visited);
+    free(queue);
+
+    return reached;
+}
+
+int minimumEffortPath(int** heights, int heightsSize, int* heightsColSize) {
+    int rows = heightsSize;
+    int cols = heightsColSize[0];
+
+    // The minimum possible effort is 0, maximum possible height difference is 10^6
+    int low = 0;
+    int high = 1000000;
+    int ans = high;
+
+    // Binary search for the minimum viable maxEffort
+    while (low <= high) {
+        int mid = low + (high - low) / 2;
+
+        if (canReachDestination(heights, rows, cols, mid)) {
+            ans = mid;        // Record valid effort
+            high = mid - 1;   // Try to find a smaller valid effort
+        } else {
+            low = mid + 1;    // Increase permitted effort limit
+        }
+    }
+
+    return ans;
+}
+[24bcs052@mepcolinux ex4]$cat l5.c
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
+// Structure to store graph edges
+typedef struct {
+    int to;
+    int cost; // 1 if original edge (needs reversal), 0 if artificial reverse edge
+} Edge;
+
+int minReorder(int n, int** connections, int connectionsSize, int* connectionsColSize) {
+    // 1. Count degrees to allocate exact space for the adjacency list
+    int* degree = (int*)calloc(n, sizeof(int));
+    for (int i = 0; i < connectionsSize; i++) {
+        degree[connections[i][0]]++;
+        degree[connections[i][1]]++;
+    }
+
+    // 2. Build the Adjacency List
+    Edge** graph = (Edge**)malloc(n * sizeof(Edge*));
+    for (int i = 0; i < n; i++) {
+        graph[i] = (Edge*)malloc(degree[i] * sizeof(Edge));
+    }
+
+    // Reuse the degree array as a pointer offset index map during insertion
+    int* head = (int*)calloc(n, sizeof(int));
+    for (int i = 0; i < connectionsSize; i++) {
+        int u = connections[i][0];
+        int v = connections[i][1];
+
+        // Original edge u -> v (cost = 1 because it moves away from 0)
+        graph[u][head[u]].to = v;
+        graph[u][head[u]].cost = 1;
+        head[u]++;
+
+        // Virtual reverse edge v -> u (cost = 0 because it moves toward 0)
+        graph[v][head[v]].to = u;
+        graph[v][head[v]].cost = 0;
+        head[v]++;
+    }
+
+    // 3. BFS Traversal setup
+    int* queue = (int*)malloc(n * sizeof(int));
+    bool* visited = (bool*)calloc(n, sizeof(bool));
+    int front = 0, rear = 0;
+    int totalReversals = 0;
+
+    // Start BFS from City 0
+    queue[rear++] = 0;
+    visited[0] = true;
+
+    while (front < rear) {
+        int curr = queue[front++];
+
+        for (int i = 0; i < degree[curr]; i++) {
+            Edge neighbor = graph[curr][i];
+            if (!visited[neighbor.to]) {
+                visited[neighbor.to] = true;
+                totalReversals += neighbor.cost; // Add 1 if it is an outgoing original edge
+                queue[rear++] = neighbor.to;
+            }
+        }
+    }
+
+    // Free dynamically allocated memory
+    for (int i = 0; i < n; i++) {
+        free(graph[i]);
+    }
+    free(graph);
+    free(degree);
+    free(head);
+    free(queue);
+    free(visited);
+
+    return totalReversals;
+}
+[24bcs052@mepcolinux ex4]$exit
+exit
+
+Script done on Mon Sep  7 10:13:23 2026
+[24bcs052@mepcolinux ex4]$
