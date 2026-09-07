@@ -175,3 +175,105 @@ int main()
 
     return 0;
 }
+24bcs052@mepcolinux ex5]$./a.out
+====================================
+       SLIDING WINDOW PROTOCOL
+====================================
+
+1. Go-Back-N
+2. Selective Repeat
+
+Enter your choice: 1
+Enter number of frames: 5
+Enter window size: 3
+Enter affected frame number (-1 for no error): 2
+
+Select error type:
+1. Lost
+2. Corrupted
+Enter choice: 1
+
+====================================
+       GO-BACK-N PROTOCOL
+====================================
+
+Sender Window: 0 1 2
+Sender  : Sending Frame 0
+Receiver: Frame 0 received
+Receiver: Sending ACK 1
+Sender  : Sending Frame 1
+Receiver: Frame 1 received
+Receiver: Sending ACK 2
+Sender  : Sending Frame 2
+Receiver: Frame 2 lost
+Receiver: ACK not received
+
+*** TIMEOUT (Frame 2 Lost) ***
+Sender  : Go back to Frame 2
+Sender  : Retransmitting: 2
+Sender  : Retransmitting Frame 2
+Receiver: Frame 2 received
+Receiver: Sending ACK 3
+
+Sender Window: 3 4
+Sender  : Sending Frame 3
+Receiver: Frame 3 received
+Receiver: Sending ACK 4
+Sender  : Sending Frame 4
+Receiver: Frame 4 received
+Receiver: Sending ACK 5
+
+Transmission completed successfully.
+====================================
+SUMMARY: Frame 2 was LOST and successfully recovered via Go-Back-N.
+====================================
+[24bcs052@mepcolinux ex5]$./a.out
+====================================
+       SLIDING WINDOW PROTOCOL
+====================================
+
+1. Go-Back-N
+2. Selective Repeat
+
+Enter your choice: 2
+Enter number of frames: 5
+Enter window size: 3
+Enter affected frame number (-1 for no error): 2
+
+Select error type:
+1. Lost
+2. Corrupted
+Enter choice: 2
+
+====================================
+      SELECTIVE REPEAT PROTOCOL
+====================================
+
+Sender Window: 0 1 2
+Sender  : Sending Frame 0
+Receiver: Frame 0 received
+Receiver: Sending ACK 1
+Sender  : Sending Frame 1
+Receiver: Frame 1 received
+Receiver: Sending ACK 2
+Sender  : Sending Frame 2
+Receiver: Frame 2 corrupted
+Receiver: ACK 3 not received
+
+*** TIMEOUT (Frame 2 Corrupted) ***
+Sender  : Retransmitting Only Frame 2
+Receiver: Frame 2 received
+Receiver: Sending ACK 3
+
+Sender Window: 3 4
+Sender  : Sending Frame 3
+Receiver: Frame 3 received
+Receiver: Sending ACK 4
+Sender  : Sending Frame 4
+Receiver: Frame 4 received
+Receiver: Sending ACK 5
+
+Transmission completed successfully.
+====================================
+SUMMARY: Frame 2 was CORRUPTED and successfully recovered via Selective Repeat.
+====================================
