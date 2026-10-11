@@ -1,0 +1,118 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <signal.h>
+#include <sys/wait.h>
+
+#define PORT 8080
+#define BUFFER_SIZE 1024
+
+int main() {
+    int server_fd, client_fd;
+    char buffer[BUFFER_SIZE];
+    char name[50], client_name[50];
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t addr_len = sizeof(client_addr);
+    pid_t pid;
+    int n;
+
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&server_addr, 0, sizeof(server_addr));
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(PORT);
+
+    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Bind failed");
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    if (listen(server_fd, 1) < 0) {
+        perror("Listen failed");
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("=============================\n");
+    printf("  TCP Full-Duplex Chat\n");
+    printf("=============================\n\n");
+
+    printf("Enter your name: ");
+    fgets(name, 50, stdin);
+    name[strcspn(name, "\n")] = '\0';
+
+    printf("Waiting for someone to join...\n\n");
+
+    client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len);
+    if (client_fd < 0) {
+        perror("Accept failed");
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    n = recv(client_fd, client_name, 50, 0);
+    client_name[n] = '\0';
+
+    send(client_fd, name, strlen(name), 0);
+
+    printf("%s joined the chat!\n", client_name);
+    printf("Type 'exit' to end the chat.\n");
+    printf("-----------------------------\n\n");
+
+    pid = fork();
+
+    if (pid == 0) {
+        while (1) {
+            n = recv(client_fd, buffer, BUFFER_SIZE, 0);
+            if (n <= 0) {
+                printf("\n%s disconnected.\n", client_name);
+                kill(getppid(), SIGTERM);
+                break;
+            }
+            buffer[n] = '\0';
+
+            if (strcmp(buffer, "exit") == 0) {
+                printf("\n%s left the chat.\n", client_name);
+                kill(getppid(), SIGTERM);
+                break;
+            }
+
+            printf("\n%s: %s\n", client_name, buffer);
+            printf("You: ");
+            fflush(stdout);
+        }
+        exit(0);
+    }
+    else {
+        while (1) {
+            printf("You: ");
+            fgets(buffer, BUFFER_SIZE, stdin);
+            buffer[strcspn(buffer, "\n")] = '\0';
+
+            send(client_fd, buffer, strlen(buffer), 0);
+
+            if (strcmp(buffer, "exit") == 0) {
+                printf("\nYou left the chat.\n");
+                kill(pid, SIGTERM);
+                break;
+            }
+        }
+        wait(NULL);
+    }
+
+    printf("-----------------------------\n");
+    printf("Chat ended.\n");
+    close(client_fd);
+    close(server_fd);
+    return 0;
+}
+
