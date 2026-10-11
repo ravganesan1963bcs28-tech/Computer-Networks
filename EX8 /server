@@ -1,0 +1,189 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define PORT 8053
+#define BUFFER_SIZE 1024
+#define MAX_RECORDS 10
+
+struct DNSRecord {
+    char domain[100];
+    char ip[50];
+};
+
+struct DNSRecord dns_table[MAX_RECORDS] = {
+    {"www.google.com",    "142.250.190.4"},
+    {"www.youtube.com",   "142.250.80.46"},
+    {"www.facebook.com",  "157.240.1.35"},
+    {"www.amazon.com",    "205.251.242.103"},
+    {"www.wikipedia.org", "208.80.154.224"},
+    {"www.twitter.com",   "104.244.42.193"},
+    {"www.instagram.com", "157.240.1.174"},
+    {"www.github.com",    "140.82.121.4"},
+    {"www.netflix.com",   "54.237.226.164"},
+    {"www.mepcoeng.ac.in","14.139.186.70"}
+};
+
+void forwardLookup(char *domain, char *result) {
+    int i;
+    for (i = 0; i < MAX_RECORDS; i++) {
+        if (strcmp(dns_table[i].domain, domain) == 0) {
+            sprintf(result, "Resolved: %s -> %s", domain, dns_table[i].ip);
+            return;
+        }
+    }
+    sprintf(result, "ERROR: Domain '%s' not found in DNS records", domain);
+}
+
+void reverseLookup(char *ip, char *result) {
+    int i;
+    for (i = 0; i < MAX_RECORDS; i++) {
+        if (strcmp(dns_table[i].ip, ip) == 0) {
+            sprintf(result, "Resolved: %s -> %s", ip, dns_table[i].domain);
+            return;
+        }
+    }
+    sprintf(result, "ERROR: IP '%s' not found in DNS records", ip);
+}
+
+void addRecord(char *domain, char *ip, char *result, int *count) {
+    int i;
+    if (*count >= MAX_RECORDS) {
+        sprintf(result, "ERROR: DNS table is full (max %d records)", MAX_RECORDS);
+        return;
+    }
+    for (i = 0; i < *count; i++) {
+        if (strcmp(dns_table[i].domain, domain) == 0) {
+            sprintf(result, "ERROR: Domain '%s' already exists", domain);
+            return;
+        }
+    }
+    strcpy(dns_table[*count].domain, domain);
+    strcpy(dns_table[*count].ip, ip);
+    (*count)++;
+    sprintf(result, "Record added: %s -> %s", domain, ip);
+}
+
+void deleteRecord(char *domain, char *result, int *count) {
+    int i, j, found;
+    found = 0;
+    for (i = 0; i < *count; i++) {
+        if (strcmp(dns_table[i].domain, domain) == 0) {
+            found = 1;
+            for (j = i; j < *count - 1; j++) {
+                strcpy(dns_table[j].domain, dns_table[j + 1].domain);
+                strcpy(dns_table[j].ip, dns_table[j + 1].ip);
+            }
+            (*count)--;
+            sprintf(result, "Record deleted: %s", domain);
+            return;
+        }
+    }
+    if (!found)
+        sprintf(result, "ERROR: Domain '%s' not found", domain);
+}
+
+void listRecords(char *result, int count) {
+    int i;
+    char line[200];
+
+    sprintf(result, "\n%-5s %-30s %-20s\n", "No.", "Domain Name", "IP Address");
+    strcat(result, "--------------------------------------------------------\n");
+
+    for (i = 0; i < count; i++) {
+        sprintf(line, "%-5d %-30s %-20s\n", i + 1, dns_table[i].domain, dns_table[i].ip);
+        strcat(result, line);
+    }
+    strcat(result, "--------------------------------------------------------\n");
+    sprintf(line, "Total records: %d\n", count);
+    strcat(result, line);
+}
+
+int main() {
+    int sockfd;
+    char buffer[BUFFER_SIZE], result[BUFFER_SIZE];
+    char command[20], arg1[256], arg2[256];
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t addr_len = sizeof(client_addr);
+    int n;
+    int record_count = MAX_RECORDS;
+
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&server_addr, 0, sizeof(server_addr));
+    memset(&client_addr, 0, sizeof(client_addr));
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(PORT);
+
+    if (bind(sockfd, (const struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Bind failed");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("==========================================\n");
+    printf("        DNS Server (UDP)\n");
+    printf("==========================================\n");
+    printf("Listening on port %d...\n", PORT);
+    printf("Loaded %d DNS records.\n", record_count);
+    printf("==========================================\n\n");
+
+    while (1) {
+        memset(buffer, 0, BUFFER_SIZE);
+        memset(result, 0, BUFFER_SIZE);
+        memset(command, 0, 20);
+        memset(arg1, 0, 256);
+        memset(arg2, 0, 256);
+
+        n = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
+                     (struct sockaddr *)&client_addr, &addr_len);
+        buffer[n] = '\0';
+
+        sscanf(buffer, "%s %s %s", command, arg1, arg2);
+
+        if (strcmp(command, "FORWARD") == 0) {
+            printf("[FORWARD LOOKUP] %s\n", arg1);
+            forwardLookup(arg1, result);
+        }
+        else if (strcmp(command, "REVERSE") == 0) {
+            printf("[REVERSE LOOKUP] %s\n", arg1);
+            reverseLookup(arg1, result);
+        }
+        else if (strcmp(command, "ADD") == 0) {
+            printf("[ADD RECORD] %s -> %s\n", arg1, arg2);
+            addRecord(arg1, arg2, result, &record_count);
+        }
+        else if (strcmp(command, "DELETE") == 0) {
+            printf("[DELETE RECORD] %s\n", arg1);
+            deleteRecord(arg1, result, &record_count);
+        }
+        else if (strcmp(command, "LIST") == 0) {
+            printf("[LIST] Sending all records\n");
+            listRecords(result, record_count);
+        }
+        else if (strcmp(command, "QUIT") == 0) {
+            printf("[QUIT] Client disconnected\n");
+            sprintf(result, "Goodbye!");
+        }
+        else {
+            sprintf(result, "ERROR: Unknown command '%s'", command);
+        }
+
+        printf("  Result: %s\n\n", result);
+
+        sendto(sockfd, result, strlen(result), 0,
+               (const struct sockaddr *)&client_addr, addr_len);
+    }
+
+    close(sockfd);
+    return 0;
+}
+
